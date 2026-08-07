@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://sidelog.dev/sitemap.xml
+Sitemap: https://utkarshloneyaitg.github.io/Sidelong/sitemap.xml
