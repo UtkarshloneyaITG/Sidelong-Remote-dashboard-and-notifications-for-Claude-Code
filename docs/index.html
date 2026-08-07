@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidelong — see what Claude Code is doing without leaving your app</title>
+<meta name="description" content="An always-on-top bar showing what every Claude Code session is doing, and when it is silently waiting on a permission prompt. Built on Claude Code's hook system, not screen scraping. Local-only, no API key.">
+<link rel="canonical" href="https://utkarshloneyaitg.github.io/Sidelong/">
+<meta name="theme-color" content="#08080a">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Sidelong">
+<meta property="og:title" content="Sidelong — see what Claude Code is doing without leaving your app">
+<meta property="og:description" content="An always-on-top bar showing what every Claude Code session is doing, and when it is silently waiting on a permission prompt. Hook-driven. Local-only. No API key.">
+<meta property="og:url" content="https://utkarshloneyaitg.github.io/Sidelong/">
+<meta property="og:image" content="https://utkarshloneyaitg.github.io/Sidelong/assets/bar-permission.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sidelong — a status bar for Claude Code">
+<meta name="twitter:description" content="Know when Claude Code is waiting on you. Hook-driven, local-only, no API key.">
+<meta name="twitter:image" content="https://utkarshloneyaitg.github.io/Sidelong/assets/bar-permission.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Sidelong",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Windows 11",
+  "description": "An always-on-top status bar showing the live state of every Claude Code session, driven by Claude Code's HTTP hook system. Surfaces permission prompts that would otherwise wait silently.",
+  "url": "https://utkarshloneyaitg.github.io/Sidelong/",
+  "codeRepository": "https://github.com/UtkarshloneyaITG/Sidelong",
+  "programmingLanguage": ["TypeScript", "JavaScript"],
+  "license": "https://github.com/UtkarshloneyaITG/Sidelong",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+</head>
+<body>
+
+<aside class="rail" aria-hidden="true">
+  <span class="rail__mark">Sidelong</span>
+  <span class="rail__dots"><i></i><i></i><i></i></span>
+  <span class="rail__mark">v0.1</span>
+</aside>
+
+<div class="wrap">
+
+<nav class="nav">
+  <a class="nav__brand" href="./">Sidelong</a>
+  <a href="#states">States</a>
+  <a href="#how">How it works</a>
+  <a href="install.html">Install</a>
+  <a href="capabilities.html">Capabilities</a>
+  <a href="https://github.com/UtkarshloneyaITG/Sidelong">GitHub&nbsp;↗</a>
+</nav>
+
+<header class="hero">
+  <span class="hero__tag">Built on <b>Claude Code hooks</b> — not screen scraping</span>
+  <h1>Know what Claude&nbsp;Code is doing.<br><em>Without going to look.</em></h1>
+  <p class="lede">
+    You hand Claude Code a task and switch to Chrome. Now you are blind. Still working?
+    Finished four minutes ago? Or sitting on a permission prompt, waiting for a click you
+    don't know it needs? Sidelong puts the answer at the edge of your screen.
+  </p>
+
+  <div class="demo">
+    <div class="demo__frame" role="img" aria-label="The Sidelong bar cycling through four states: thinking, reading a file, waiting on a permission prompt for npm install, and finished.">
+      <div class="frame">
+        <span class="dot dot--work"></span><span class="proj">demo</span>
+        <span class="plain">Thinking…</span><span class="time">00:14</span>
+      </div>
+      <div class="frame">
+        <span class="dot dot--work"></span><span class="proj">demo</span>
+        <span class="chip">Reading src/app.ts</span><span class="time">00:22</span>
+      </div>
+      <div class="frame">
+        <span class="dot dot--attn"></span><span class="proj">demo</span><span class="badge">+1</span>
+        <span class="chip chip--attn">Run `npm install`?</span>
+        <span class="mini">Open VS Code</span><span class="mini">ok</span>
+      </div>
+      <div class="frame">
+        <span class="dot dot--done"></span><span class="proj">demo</span>
+        <span class="plain">Added a /health endpoint and a test for it.</span><span class="time">01:47</span>
+      </div>
+    </div>
+    <p class="demo__caption">↑ a live replica — the real thing is 560×56 and never resizes</p>
+  </div>
+
+  <div class="hero__cta">
+    <a class="btn btn--solid" href="install.html">Install in 4 steps →</a>
+    <a class="btn btn--ghost" href="https://github.com/UtkarshloneyaITG/Sidelong">View source</a>
+    <a class="btn btn--ghost" href="capabilities.html">What it can't do</a>
+  </div>
+</header>
+
+<section id="why">
+  <p class="eyebrow">01 — The problem</p>
+  <h2>A permission prompt makes <em>no sound</em>.</h2>
+  <p>
+    No taskbar flash. No notification. Claude Code just quietly stops and waits, and you find
+    out whenever you next happen to look. Multiply that by a dozen times a day and it is the
+    single most expensive thing about working with an agent in another window.
+  </p>
+  <p>
+    That one state is what this tool is optimised around. Everything else — activity, files
+    changed, errors, completion — is the same signal put to work.
+  </p>
+
+  <div class="note">
+    <p><strong>Why not just read it from the VS Code API?</strong> Because it cannot be done.
+    The Extension API cannot see inside another extension, terminal scrollback is not readable
+    through any supported API, and screen scraping breaks on every UI change. Claude Code
+    ships hooks for exactly this purpose. That is the entire design.</p>
+  </div>
+</section>
+
+<section id="states">
+  <p class="eyebrow">02 — What you actually see</p>
+  <h2>Real states, from <em>real events</em>.</h2>
+  <p>
+    Every line below is produced by a hook event Claude Code actually fired. Nothing is
+    inferred from a timer, and no filename or command is ever invented — if the target can't
+    be determined, it says so instead of guessing.
+  </p>
+
+  <div class="shots">
+    <figure class="shot--bar">
+      <img src="assets/bar-thinking.png" width="706" height="74" loading="lazy"
+           alt="Sidelong bar showing a green dot, project name demo, and the text Thinking… with a 00:02 timer.">
+      <figcaption>Thinking — the turn is open and no tool is running. No hook fires during inference, so this is the honest name for a gap we can bound but not see into.</figcaption>
+    </figure>
+
+    <figure class="shot--bar">
+      <img src="assets/bar-working.png" width="706" height="74" loading="lazy"
+           alt="Sidelong bar showing a green dot and the command Running npm run build in a monospace chip.">
+      <figcaption>Auto-running — Claude is executing without asking, so the bar tracks the command and shows no buttons. There is nothing for you to decide.</figcaption>
+    </figure>
+
+    <figure class="shot--bar">
+      <img src="assets/bar-permission.png" width="706" height="74" loading="lazy"
+           alt="Sidelong bar with an amber border and dot, showing Run npm install? next to Open VS Code and ok buttons.">
+      <figcaption>Blocked — amber, with the <em>actual</em> command from the tool input. The buttons fade in over the command rather than resizing the window.</figcaption>
+    </figure>
+  </div>
+
+  <div class="shots shots--split" style="margin-top:34px">
+    <figure>
+      <img src="assets/expanded.png" width="441" height="540" loading="lazy"
+           alt="Sidelong expanded card showing a completion summary, an activity timeline with a failed npm test, two changed files, and connection status.">
+      <figcaption>The expanded card</figcaption>
+    </figure>
+    <div>
+      <h3>Everything, when you want it</h3>
+      <p>
+        Claude's own summary line, the activity timeline with the failed <code>npm test</code>
+        in red, the files it changed, and a connection row that distinguishes
+        <strong>"bridge disconnected"</strong> from <strong>"no agent session"</strong> —
+        different problems with different fixes.
+      </p>
+      <p>
+        A session blocked on permission always wins the bar, even if another session is
+        chattier. That is the one thing you must not miss.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <p class="eyebrow">03 — What you get</p>
+  <h2>Quiet until it <em>matters</em>.</h2>
+  <div class="grid grid--3">
+    <div class="cell"><span class="cell__n">01</span><h3>The prompt, not a hint</h3>
+      <p>“Run <code>npm install</code>?” — the real command from the tool input, never a vague “needs permission”.</p></div>
+    <div class="cell"><span class="cell__n">02</span><h3>Live activity</h3>
+      <p>Reading, editing, running, thinking — with the real file and the real command.</p></div>
+    <div class="cell"><span class="cell__n">03</span><h3>Typed errors</h3>
+      <p>Rate limited · overloaded · billing · auth — the true error class, not “something failed”.</p></div>
+    <div class="cell"><span class="cell__n">04</span><h3>Many projects</h3>
+      <p>Every session tracked separately. A blocked one always takes the bar.</p></div>
+    <div class="cell"><span class="cell__n">05</span><h3>Silent when you're there</h3>
+      <p>With the VS Code bridge, notifications stay quiet while VS Code has focus.</p></div>
+    <div class="cell"><span class="cell__n">06</span><h3>Cannot break your session</h3>
+      <p>Hook failures are non-blocking by design. Kill the app mid-run and Claude Code doesn't notice.</p></div>
+  </div>
+</section>
+
+<section id="how">
+  <p class="eyebrow">04 — How it works</p>
+  <h2>One pure function, and <em>plumbing</em>.</h2>
+  <p>
+    Claude Code hooks POST lifecycle events to a local endpoint. A pure
+    <code>(state, event) → state</code> reducer turns them into what you see. No I/O, no
+    timers, no <code>Date.now()</code> inside it — which is why the same fixture stream always
+    produces the same state sequence, and why it is the part that gets tested.
+  </p>
+
+<pre><code><span class="c">Claude Code (terminal · IDE · desktop · web)</span>
+      │  hooks: HTTP POST → 127.0.0.1:47821
+      ▼
+  HTTP ingest ──▶ reduce(state, event) ──▶ buildView() ──▶ the bar
+  <span class="c">204 first,        pure · testable        one place        renders only</span>
+  <span class="c">then process                              severity lives   what it's given</span>
+      ▲
+      │  WebSocket (optional)
+  VS Code bridge — workspace · focus · active file · diagnostics</code></pre>
+
+  <div class="grid grid--2" style="margin-top:8px">
+    <div class="cell"><span class="cell__n">Guarantee</span><h3>The UI can't fake it</h3>
+      <p>The renderer holds no agent state and the preload exposes no channel that can set a status. Resize, focus, quit, acknowledge, install hooks — that is the entire API surface.</p></div>
+    <div class="cell"><span class="cell__n">Guarantee</span><h3>Your code stays local</h3>
+      <p>Hook payloads carry whole file contents. Truncation happens inside the reducer, before anything crosses into the UI. Nothing is logged, nothing is sent anywhere.</p></div>
+  </div>
+</section>
+
+<section id="start">
+  <p class="eyebrow">05 — Quick start</p>
+  <h2>Four commands.</h2>
+<pre><code>npm install &amp;&amp; npm run build
+npm start                                  <span class="c"># launch the bar</span>
+node tools/install-hooks.mjs install       <span class="c"># wire up Claude Code</span>
+node tools/install-hooks.mjs status        <span class="c"># confirm</span></code></pre>
+  <p>Then run <code>/hooks</code> inside Claude Code to see the entries. Full walkthrough,
+  including the VS Code bridge and troubleshooting, on the
+  <a href="install.html">installation page</a>.</p>
+
+  <div class="note note--warn">
+    <p><strong>Launching from a terminal inside VS Code?</strong> VS Code sets
+    <code>ELECTRON_RUN_AS_NODE=1</code>, which makes Electron behave as plain Node — the app
+    silently fails to open a window. Unset it first.</p>
+  </div>
+</section>
+
+<section id="honest">
+  <p class="eyebrow">06 — Limits</p>
+  <h2>What it <em>can't</em> do.</h2>
+  <p>
+    A limitation documented is worth more than a capability faked. The full ledger classifies
+    every claim as supported, partially supported, or impossible — with its failure mode.
+  </p>
+  <table>
+    <tr><td><span class="tag-no">no</span></td><td><strong>Detect the moment you approve.</strong> Permission grants are silent — no hook fires. The earliest hard evidence is the tool finishing.</td></tr>
+    <tr><td><span class="tag-no">no</span></td><td><strong>Read Claude's thinking.</strong> Nothing fires during inference. A long silence dims the bar; it never re-labels it.</td></tr>
+    <tr><td><span class="tag-part">part</span></td><td><strong>Test results.</strong> Inferring “tests passed” from an exit code is a guess, so it isn't made.</td></tr>
+    <tr><td><span class="tag-ok">yes</span></td><td><strong>Everything above</strong> — session lifecycle, tool activity with real targets, permission detection, typed errors, file tracking.</td></tr>
+  </table>
+  <p><a class="btn btn--ghost" href="capabilities.html">Read the full capability ledger →</a></p>
+</section>
+
+<footer>
+  <div class="footer__row">
+    <a href="https://github.com/UtkarshloneyaITG/Sidelong">GitHub</a>
+    <a href="install.html">Install</a>
+    <a href="capabilities.html">Capabilities</a>
+    <span>Verified against Claude Code 2.1.119 · Windows 11</span>
+  </div>
+</footer>
+
+</div>
+</body>
+</html>
