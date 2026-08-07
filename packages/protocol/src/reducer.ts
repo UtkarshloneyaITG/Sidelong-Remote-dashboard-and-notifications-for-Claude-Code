@@ -94,6 +94,21 @@ function closeActivity(
 const addFile = (files: string[], f: string | undefined): string[] =>
   !f || files.includes(f) ? files : [...files, f].slice(-MAX_FILES);
 
+/**
+ * Clear a pending prompt because the session has demonstrably moved on.
+ *
+ * Returns an empty patch when nothing was pending, so callers can spread it
+ * unconditionally without disturbing a session that was never blocked.
+ */
+function unblocked(s: SessionState): Partial<SessionState> {
+  if (!s.pendingPermission) return {};
+  return {
+    pendingPermission: undefined,
+    status: s.status === 'WAITING_FOR_PERMISSION' ? 'WORKING' : s.status,
+    message: s.status === 'WAITING_FOR_PERMISSION' ? 'Claude is working…' : s.message,
+  };
+}
+
 /** Start of a new turn: drop the previous turn's outcome, keep the session. */
 function beginTurn(s: SessionState, now: number, message: string): SessionState {
   return {
@@ -303,19 +318,25 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
         turnStartedAt: undefined,
       };
 
+    // A session actually blocked on a permission prompt emits NOTHING while it
+    // waits. So any of these arriving proves the prompt is no longer blocking --
+    // it was answered, denied, or interrupted -- even when the event that
+    // resolved it is one we never see. Deliberately NOT applied to the default
+    // branch: falsely clearing a real prompt hides the one state this app
+    // exists for, so unknown future events are left alone.
     case 'SubagentStart':
-      return { ...base, subagents: base.subagents + 1 };
+      return { ...base, ...unblocked(base), subagents: base.subagents + 1 };
 
     case 'SubagentStop':
-      return { ...base, subagents: Math.max(0, base.subagents - 1) };
+      return { ...base, ...unblocked(base), subagents: Math.max(0, base.subagents - 1) };
 
     case 'PreCompact':
       // Not cosmetic: compaction is the most common cause of a long silence that
       // otherwise looks like a hang.
-      return { ...base, compacting: true, details: 'Compacting context…' };
+      return { ...base, ...unblocked(base), compacting: true, details: 'Compacting context…' };
 
     case 'PostCompact':
-      return { ...base, compacting: false, details: undefined };
+      return { ...base, ...unblocked(base), compacting: false, details: undefined };
 
     default:
       // An event we do not model still proves the session is alive.
