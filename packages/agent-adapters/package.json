@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "AgentAdapter interface plus the Claude Code adapter. Keeps the overlay agnostic about which agent it is watching.",
+  "license": "MIT",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -16,6 +16,7 @@ when it is silently waiting on a permission prompt.
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-hooks-D97757?logo=anthropic&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-58%20passing-3FB950)
 ![Vulnerabilities](https://img.shields.io/badge/npm%20audit-0-3FB950)
+![License](https://img.shields.io/badge/license-MIT-F5B544)
 
 [Why](#why-this-exists) · [What you get](#what-you-get) · [Architecture](#architecture) · [Quick start](#quick-start) · [Using it](#using-it) · [Capabilities](#capabilities) · [Security](#security)
 
@@ -481,6 +482,19 @@ Removes **only** entries whose URL starts with this app's base URL — nothing e
 Your original settings file is also backed up at `settings.json.agent-watcher-backup` from
 before the first change. Inside Claude Code, `/hooks` shows what remains and
 `disableAllHooks` turns everything off at once.
+
+## License
+
+**[MIT](LICENSE) — free for everyone, forever.**
+
+Use it, modify it, redistribute it, build a product on it, sell it. Commercial
+use is fine and you owe nothing. The only condition is that the copyright notice
+stays in copies of the source — that is the whole of it.
+
+No warranty is given, which is standard for MIT: if it breaks, you keep both
+pieces. Worth noting that the one failure mode people actually care about here is
+covered by design rather than by a legal disclaimer — hook failures are
+non-blocking, so Sidelong cannot take your coding session down with it.
 
 ## Roadmap — permission controls
 
