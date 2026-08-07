@@ -367,6 +367,50 @@ test('a tool failure with no permission outstanding leaves status alone', () => 
   assert.equal(s.status, 'COMPLETED');
 });
 
+// Observed live: a prompt the user DENIED stayed on screen for 17 minutes. A
+// session actually blocked emits nothing, so any later event proves it moved on
+// -- even when the event that resolved the prompt is one we never receive.
+test('any later session event clears a pending prompt', () => {
+  const later = [
+    { hook_event_name: 'SubagentStart', agent_id: 'a', agent_type: 'Explore' },
+    { hook_event_name: 'SubagentStop', agent_id: 'a', agent_type: 'Explore' },
+    { hook_event_name: 'PreCompact' },
+    { hook_event_name: 'PostCompact' },
+  ];
+  for (const event of later) {
+    const blocked = reduceAll(initialState, fx('permission.jsonl').slice(0, 3));
+    assert.equal(only(blocked).status, 'WAITING_FOR_PERMISSION');
+    const after = reduce(blocked, {
+      protocolVersion: 1, matcher: '*', receivedAt: 9_000,
+      event: { session_id: 's-perm-1', ...event },
+    });
+    assert.equal(only(after).pendingPermission, undefined, `${event.hook_event_name} must clear it`);
+    assert.equal(only(after).status, 'WORKING', `${event.hook_event_name} must unblock`);
+  }
+});
+
+test('an unknown future event does NOT clear a real prompt', () => {
+  // The expensive direction of this error is hiding a genuine prompt, so an
+  // event we do not model is left alone rather than assumed to be progress.
+  const blocked = reduceAll(initialState, fx('permission.jsonl').slice(0, 3));
+  const after = reduce(blocked, {
+    protocolVersion: 1, receivedAt: 9_000,
+    event: { session_id: 's-perm-1', hook_event_name: 'SomeFutureEvent' },
+  });
+  assert.equal(after.sessions['s-perm-1'].status, 'WAITING_FOR_PERMISSION');
+  assert.ok(after.sessions['s-perm-1'].pendingPermission);
+});
+
+test('clearing is a no-op for a session that was never blocked', () => {
+  const working = reduceAll(initialState, fx('tool-activity.jsonl').slice(0, 2));
+  const after = reduce(working, {
+    protocolVersion: 1, matcher: '*', receivedAt: 9_000,
+    event: { session_id: 's-tool-1', hook_event_name: 'SubagentStart', agent_type: 'Explore' },
+  });
+  assert.equal(only(after).status, 'WORKING');
+  assert.equal(only(after).message, 'Reading src/app.ts', 'headline must survive');
+});
+
 test('a permission inside its grace window is NOT actionable', () => {
   const s = reduceAll(initialState, fx('permission.jsonl').slice(0, 3));
   const at = only(s).pendingPermission.at;
