@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+
+/* The window is transparent; the rounded card in App.tsx paints the surface. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+body {
+  font-family:
+    'Inter', ui-sans-serif, -apple-system, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Drag regions. Anything interactive must carry .no-drag or it swallows clicks. */
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag,
+button,
+a,
+input {
+  -webkit-app-region: no-drag;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(63 63 70 / 0.7);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -1,0 +1,24 @@
+{
+  "name": "agent-watcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Always-on-top overlay showing live Claude Code state, driven by Claude Code hooks.",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "extensions/*"
+  ],
+  "scripts": {
+    "test": "npm run test -w @agent-watcher/protocol",
+    "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",
+    "build:packages": "npm run build -w @agent-watcher/protocol && npm run build -w @agent-watcher/agent-adapters",
+    "dev": "npm run build:packages && npm run dev -w @agent-watcher/desktop",
+    "build": "npm run build:packages && npm run build -w @agent-watcher/desktop && npm run build -w agent-watcher-bridge",
+    "start": "npm run start -w @agent-watcher/desktop",
+    "replay": "node tools/replay.mjs",
+    "capture": "node tools/capture/capture.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
