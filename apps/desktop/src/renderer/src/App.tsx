@@ -190,7 +190,7 @@ function Setup({ onClose }: { onClose: () => void }): JSX.Element {
   useEffect(refresh, [refresh]);
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col bg-zinc-950/98 p-3">
+    <div className="absolute inset-0 z-10 flex flex-col bg-zinc-950 p-3">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-zinc-200">Hook setup</span>
         <button type="button" className="no-drag text-[11px] text-zinc-500 hover:text-zinc-200" onClick={onClose}>
@@ -282,7 +282,7 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
 
   return (
     <div
-      className={`drag relative flex h-screen w-screen items-center gap-2.5 overflow-hidden rounded-full border-2 bg-zinc-950/95 px-2.5 transition-colors duration-300 ${
+      className={`drag relative flex h-screen w-screen items-center gap-2.5 overflow-hidden rounded-full border-2 bg-zinc-950 px-2.5 transition-colors duration-300 ${
         pending ? 'border-amber-500/60' : 'border-zinc-700/80'
       }`}
     >
@@ -458,7 +458,12 @@ export default function App(): JSX.Element {
   );
 
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/95 text-zinc-200 shadow-2xl backdrop-blur-xl">
+    // Opaque, not translucent. `backdrop-blur` cannot sample the desktop behind a
+    // transparent Electron window -- it only blurs what is behind it inside the
+    // page -- so a see-through card just leaks whatever you happen to be sitting
+    // on top of. A status readout has to be legible over a busy editor at a
+    // glance, which beats the aesthetic of transparency that never blurred.
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-200 shadow-2xl">
       {header}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-1">

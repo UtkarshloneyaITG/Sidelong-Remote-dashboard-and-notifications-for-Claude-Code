@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install Sidelong — Claude Code hooks setup guide</title>
+<meta name="description" content="Step-by-step guide to installing Sidelong: build the overlay, install Claude Code HTTP hooks at user or project scope, verify with /hooks, add the VS Code bridge, and troubleshoot common problems.">
+<link rel="canonical" href="https://utkarshloneyaitg.github.io/Sidelong/install.html">
+<meta name="theme-color" content="#08080a">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Sidelong">
+<meta property="og:title" content="Install Sidelong — Claude Code hooks setup guide">
+<meta property="og:description" content="Build, launch, install hooks, verify with /hooks, add the VS Code bridge. Plus the troubleshooting table.">
+<meta property="og:url" content="https://utkarshloneyaitg.github.io/Sidelong/install.html">
+<meta property="og:image" content="https://utkarshloneyaitg.github.io/Sidelong/assets/bar-permission.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "Install Sidelong for Claude Code",
+  "description": "Build the overlay, install Claude Code HTTP hooks, and verify the connection.",
+  "step": [
+    { "@type": "HowToStep", "name": "Build and launch", "text": "npm install, npm run build, npm start" },
+    { "@type": "HowToStep", "name": "Install the hooks", "text": "node tools/install-hooks.mjs install" },
+    { "@type": "HowToStep", "name": "Verify", "text": "Run /hooks inside Claude Code and curl the health endpoint" },
+    { "@type": "HowToStep", "name": "Optional VS Code bridge", "text": "Package and install the extension for focus detection" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<aside class="rail" aria-hidden="true">
+  <span class="rail__mark">Sidelong</span>
+  <span class="rail__dots"><i></i><i></i><i></i></span>
+  <span class="rail__mark">Install</span>
+</aside>
+
+<div class="wrap">
+
+<nav class="nav">
+  <a class="nav__brand" href="./">Sidelong</a>
+  <a href="./#states">States</a>
+  <a href="./#how">How it works</a>
+  <a href="install.html" aria-current="page">Install</a>
+  <a href="capabilities.html">Capabilities</a>
+  <a href="https://github.com/UtkarshloneyaITG/Sidelong">GitHub&nbsp;↗</a>
+</nav>
+
+<header class="hero" style="padding-bottom:36px">
+  <p class="eyebrow">Setup</p>
+  <h1>Install <em>Sidelong</em></h1>
+  <p class="lede">
+    Four steps, about three minutes. No API key, no account, no <code>.env</code> file —
+    the port and token are generated locally on first launch.
+  </p>
+</header>
+
+<section style="padding-top:0">
+  <p class="eyebrow">Before you start</p>
+  <table>
+    <tr><th>Requirement</th><th>Notes</th></tr>
+    <tr><td><strong>Claude Code</strong></td><td>With HTTP hook support. Verified on <code>2.1.119</code> — check with <code>claude --version</code>.</td></tr>
+    <tr><td><strong>Node.js 20+</strong></td><td>For the build and the CLI tools.</td></tr>
+    <tr><td><strong>Windows 11</strong></td><td>Tested. macOS and Linux are best-effort and <strong>untested</strong> — the code is portable, but always-on-top behaviour and notifications are the likely rough edges.</td></tr>
+    <tr><td><strong>VS Code</strong></td><td>Optional. Only the bridge extension needs it.</td></tr>
+  </table>
+</section>
+
+<section>
+  <div class="steps">
+
+    <div class="step">
+      <h3>Build and launch</h3>
+<pre><code>git clone https://github.com/UtkarshloneyaITG/Sidelong.git
+cd Sidelong
+npm install
+npm run build
+npm start</code></pre>
+      <p>First launch writes a config file with a fixed port (<code>47821</code>) and a
+      persistent random 64-character token. Both stay stable across restarts, because they get
+      written into your Claude Code settings in the next step.</p>
+
+      <div class="note note--warn">
+        <p><strong>Running this from a terminal inside VS Code?</strong> VS Code sets
+        <code>ELECTRON_RUN_AS_NODE=1</code>, which makes the Electron binary behave as plain
+        Node. The app will exit without ever opening a window. Clear it first:</p>
+      </div>
+<pre><code><span class="c"># PowerShell</span>
+Remove-Item Env:\ELECTRON_RUN_AS_NODE
+
+<span class="c"># bash</span>
+unset ELECTRON_RUN_AS_NODE</code></pre>
+    </div>
+
+    <div class="step">
+      <h3>Install the hooks</h3>
+      <p>From the app: expand the bar → <strong>Hooks</strong> → <strong>Install</strong>.
+      Or from the CLI:</p>
+<pre><code>node tools/install-hooks.mjs install                  <span class="c"># all projects (recommended)</span>
+node tools/install-hooks.mjs install --scope project <span class="c"># this repo only</span>
+node tools/install-hooks.mjs status</code></pre>
+      <p>
+        <strong>User scope is the default</strong> — <code>~/.claude/settings.json</code>, so one
+        install covers every project. Per-project means no overlay in whichever repo you forgot,
+        which rather defeats the point.
+      </p>
+      <div class="note">
+        <p><strong>It is safe to run on an existing settings file.</strong> The installer merges
+        into existing hook arrays without clobbering them, is idempotent, backs the file up once
+        before its first change (<code>settings.json.agent-watcher-backup</code>), and never
+        writes managed policy settings. Uninstall removes only entries whose URL starts with
+        Sidelong's own base URL.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3>Verify</h3>
+      <p>Inside Claude Code, list the installed hooks:</p>
+<pre><code>/hooks</code></pre>
+      <p>And confirm the receiver is live (token is in your config file):</p>
+<pre><code>curl -H "X-Agent-Watcher-Token: &lt;token&gt;" http://127.0.0.1:47821/health
+<span class="c"># {"ok":true,"protocolVersion":1}</span></code></pre>
+      <p>Now give Claude Code a task. The bar should move within a second.</p>
+      <div class="note">
+        <p><strong>Sessions already running are not retrofitted.</strong> Hooks are read from
+        settings when a session starts, so restart any session that was open before you
+        installed.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3>Add the VS Code bridge <span style="color:var(--text-3);font-family:var(--mono);font-size:12px">— optional</span></h3>
+<pre><code>npm run package -w agent-watcher-bridge
+code --install-extension extensions/vscode-bridge/agent-watcher-bridge.vsix</code></pre>
+      <p>The overlay is fully functional without it. Installing it adds:</p>
+      <ul class="tight">
+        <li>notifications suppressed while VS Code already has focus</li>
+        <li>prompts auto-acknowledged when you switch to VS Code to deal with them</li>
+        <li>a reliable target for <strong>[Open VS Code]</strong></li>
+        <li>git branch, active file, and error/warning counts on the expanded card</li>
+      </ul>
+      <p>It reads the token from the desktop app's own config file, so nothing secret is stored
+      in VS Code settings or carried through Settings Sync. It never modifies project files.</p>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">Configuration</p>
+  <h2>One file. No env vars.</h2>
+  <table>
+    <tr><th>OS</th><th>Config path</th></tr>
+    <tr><td>Windows</td><td><code>%APPDATA%\agent-watcher-desktop\config.json</code></td></tr>
+    <tr><td>macOS</td><td><code>~/Library/Application Support/agent-watcher-desktop/config.json</code></td></tr>
+    <tr><td>Linux</td><td><code>~/.config/agent-watcher-desktop/config.json</code></td></tr>
+  </table>
+  <table>
+    <tr><th>Field</th><th>Default</th><th>Purpose</th></tr>
+    <tr><td><code>port</code></td><td>47821</td><td>Receiver port. <strong>Baked into installed hooks</strong> — changing it needs a reinstall.</td></tr>
+    <tr><td><code>token</code></td><td>random 64 hex</td><td>Local shared secret, generated once then stable.</td></tr>
+    <tr><td><code>shortcut</code></td><td><code>Control+Shift+Space</code></td><td>Global show / minimize.</td></tr>
+    <tr><td><code>staleMs</code></td><td>90000</td><td>Silence after which a working session dims. <strong>Never changes its status.</strong></td></tr>
+    <tr><td><code>completedDismissMs</code></td><td>20000</td><td>How long a finished turn stays expanded. <code>0</code> disables.</td></tr>
+    <tr><td><code>debugLog</code></td><td>false</td><td>Opt-in local logging. Off by default — payloads are sensitive.</td></tr>
+  </table>
+  <div class="note note--warn">
+    <p><strong>The default shortcut collides with VS Code.</strong>
+    <code>Ctrl+Shift+Space</code> is VS Code's <em>Trigger Parameter Hints</em>, and a global
+    shortcut wins — so VS Code loses that binding while Sidelong runs. Change
+    <code>shortcut</code> in the config; <code>Ctrl+Alt+Space</code> is unbound on a stock setup.</p>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">Troubleshooting</p>
+  <h2>When it doesn't move.</h2>
+  <table>
+    <tr><th>Symptom</th><th>Cause &amp; fix</th></tr>
+    <tr><td><strong>Overlay never updates</strong></td><td>Run <code>node tools/install-hooks.mjs status</code>. If <code>allowedHttpHookUrls</code> is set anywhere in your settings it silently gates HTTP hooks — the installer prints the exact URL to add. Also restart any session that was already running.</td></tr>
+    <tr><td><strong>No window opens</strong></td><td><code>ELECTRON_RUN_AS_NODE=1</code> is set by VS Code. Unset it and relaunch.</td></tr>
+    <tr><td><strong>“Port 47821 is already in use”</strong></td><td>Deliberate — moving silently would orphan every installed hook, and hook failures are silent by design. Free the port, or accept the dialog's offer to move to <code>47822</code> and reinstall.</td></tr>
+    <tr><td><strong>[Open VS Code] says “Install the VS Code bridge”</strong></td><td>There is no safe file to open yet and no bridge to name the active one. Install the extension. This is intentional: the alternative was opening a folder, which used to launch a new window and could evict the session.</td></tr>
+    <tr><td><strong>Notifications fire while I'm in VS Code</strong></td><td>Focus detection needs the bridge extension. Install it.</td></tr>
+    <tr><td><strong>Did the overlay break my session?</strong></td><td>It cannot. Hook connection failures, timeouts and non-2xx responses are all non-blocking by design — tested by killing the app mid-session and confirming tool calls still ran at normal speed.</td></tr>
+  </table>
+</section>
+
+<section>
+  <p class="eyebrow">Removing it</p>
+  <h2>Clean uninstall.</h2>
+<pre><code>node tools/install-hooks.mjs uninstall                 <span class="c"># user scope</span>
+node tools/install-hooks.mjs uninstall --scope project
+code --uninstall-extension agent-watcher.agent-watcher-bridge</code></pre>
+  <p>
+    Only entries whose URL starts with Sidelong's base URL are removed — nothing else in your
+    settings is touched, and the pre-change backup is still there. Inside Claude Code,
+    <code>/hooks</code> shows what remains and <code>disableAllHooks</code> turns everything
+    off at once.
+  </p>
+</section>
+
+<footer>
+  <div class="footer__row">
+    <a href="https://github.com/UtkarshloneyaITG/Sidelong">GitHub</a>
+    <a href="./">Home</a>
+    <a href="capabilities.html">Capabilities</a>
+    <span>Verified against Claude Code 2.1.119 · Windows 11</span>
+  </div>
+</footer>
+
+</div>
+</body>
+</html>

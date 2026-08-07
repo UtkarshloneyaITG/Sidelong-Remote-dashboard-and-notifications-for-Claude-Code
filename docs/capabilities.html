@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capabilities — what Claude Code hooks can and cannot observe</title>
+<meta name="description" content="An honest ledger of what Sidelong can observe through Claude Code hooks: session lifecycle, tool activity, permission prompts and typed errors — and what is genuinely impossible, including detecting permission grants and reading Claude's thinking.">
+<link rel="canonical" href="https://utkarshloneyaitg.github.io/Sidelong/capabilities.html">
+<meta name="theme-color" content="#08080a">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Sidelong">
+<meta property="og:title" content="Capabilities — what Claude Code hooks can and cannot observe">
+<meta property="og:description" content="Every claim classified supported, partially supported, or impossible — each with its failure mode.">
+<meta property="og:url" content="https://utkarshloneyaitg.github.io/Sidelong/capabilities.html">
+<meta property="og:image" content="https://utkarshloneyaitg.github.io/Sidelong/assets/bar-permission.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<aside class="rail" aria-hidden="true">
+  <span class="rail__mark">Sidelong</span>
+  <span class="rail__dots"><i></i><i></i><i></i></span>
+  <span class="rail__mark">Ledger</span>
+</aside>
+
+<div class="wrap">
+
+<nav class="nav">
+  <a class="nav__brand" href="./">Sidelong</a>
+  <a href="./#states">States</a>
+  <a href="./#how">How it works</a>
+  <a href="install.html">Install</a>
+  <a href="capabilities.html" aria-current="page">Capabilities</a>
+  <a href="https://github.com/UtkarshloneyaITG/Sidelong">GitHub&nbsp;↗</a>
+</nav>
+
+<header class="hero" style="padding-bottom:30px">
+  <p class="eyebrow">The ledger</p>
+  <h1>A limitation documented beats a <em>capability faked</em>.</h1>
+  <p class="lede">
+    Every claim this project could make, classified — with the mechanism behind it and how it
+    fails. Verified against Claude Code <strong>2.1.119</strong> on Windows 11, against the
+    hooks reference, and against <strong>real payloads captured from live sessions</strong>.
+  </p>
+</header>
+
+<section style="padding-top:0">
+  <p class="eyebrow"><span class="tag-ok">supported</span></p>
+  <h2>Things it genuinely does.</h2>
+  <table>
+    <tr><th>Claim</th><th>Mechanism</th><th>Failure mode</th></tr>
+    <tr>
+      <td><strong>Session lifecycle</strong></td>
+      <td><code>SessionStart</code> / <code>SessionEnd</code>, one hook entry per matcher so the reason is known from the URL.</td>
+      <td>A hard kill fires nothing; the session holds its last real status until a 10-minute TTL prunes it. It never invents a “disconnected”.</td>
+    </tr>
+    <tr>
+      <td><strong>Tool activity with real targets</strong><br><span class="tag-ok">payload captured</span></td>
+      <td><code>PreToolUse</code> / <code>PostToolUse</code> with <code>tool_name</code> + <code>tool_input</code>.</td>
+      <td>An unknown tool degrades to <code>Using &lt;Tool&gt;</code>; unreadable input degrades to <code>Thinking…</code>. Never a guessed filename.</td>
+    </tr>
+    <tr>
+      <td><strong>Permission detection with the real command</strong><br><span class="tag-ok">payload captured</span></td>
+      <td><code>PermissionRequest</code> (primary) with <code>Notification[permission_prompt]</code> as a de-duplicated backstop.</td>
+      <td>If neither fires, the bar shows <code>WORKING</code> and simply doesn't know. It will not infer a prompt from silence.</td>
+    </tr>
+    <tr>
+      <td><strong>Telling a real prompt from an auto-approved one</strong></td>
+      <td>The prompt must outlive a 700 ms grace window before buttons or a toast appear.</td>
+      <td>A genuine prompt surfaces 700 ms late — inside the one-second target. A pathologically slow auto-approval would flash briefly.</td>
+    </tr>
+    <tr>
+      <td><strong>Completion with a summary</strong><br><span class="tag-ok">payload captured</span></td>
+      <td><code>Stop</code>, using <code>last_assistant_message</code>.</td>
+      <td>Missing field falls back to <code>Done</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Typed API errors</strong></td>
+      <td><code>StopFailure</code> — the matcher <em>is</em> the error class (<code>rate_limit</code>, <code>overloaded</code>, <code>billing_error</code>…).</td>
+      <td>An unlabelled class renders as <code>Failed: &lt;class&gt;</code> rather than a generic error.</td>
+    </tr>
+    <tr>
+      <td><strong>Interrupt vs failure</strong><br><span class="tag-ok">payload captured</span></td>
+      <td><code>PostToolUseFailure.is_interrupt</code> — true when you pressed Esc.</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><strong>File-change tracking</strong></td>
+      <td><code>PostToolUse</code> on <code>Edit</code>/<code>Write</code>/<code>MultiEdit</code>/<code>NotebookEdit</code>.</td>
+      <td>A file written by a shell redirect inside <code>Bash</code> is invisible — only tool-level writes count.</td>
+    </tr>
+    <tr>
+      <td><strong>Concurrent sessions</strong><br><span class="tag-ok">verified with 3 live</span></td>
+      <td><code>session_id</code> keys everything; <code>cwd</code> matches against the bridge's workspace folders.</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><strong>Closing the overlay can't affect your session</strong><br><span class="tag-ok">measured</span></td>
+      <td>Hook connection failure, timeout and non-2xx are all non-blocking by design.</td>
+      <td>Tool calls ran in <strong>39 ms and 67 ms</strong> with every hook pointed at a dead server.</td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <p class="eyebrow"><span class="tag-part">partially supported</span></p>
+  <h2>Things it half does.</h2>
+  <table>
+    <tr><th>Claim</th><th>What works</th><th>What doesn't</th></tr>
+    <tr>
+      <td><strong>“Waiting for input” vs idle</strong></td>
+      <td><code>Notification</code> matchers <code>idle_prompt</code>, <code>agent_needs_input</code> and <code>elicitation_dialog</code> map to <code>WAITING_FOR_INPUT</code>.</td>
+      <td>These matchers are documented but <strong>were never observed firing</strong> during capture, so the mapping comes from the reference rather than a recorded payload. Treat it as best-effort.</td>
+    </tr>
+    <tr>
+      <td><strong>Test / build results</strong></td>
+      <td>A failed <code>Bash</code> call shows as a failed activity item with the real error text.</td>
+      <td>Nothing knows that <code>npm test</code> <em>is</em> the test suite, or that exit 0 means green. Inferring “tests passed” is a guess, so it isn't made.</td>
+    </tr>
+    <tr>
+      <td><strong>Elapsed time</strong></td>
+      <td>Accurate from <code>UserPromptSubmit</code>, which is when the turn genuinely starts.</td>
+      <td>A session first observed mid-turn starts its clock at the first event seen, under-reporting. Never backdated.</td>
+    </tr>
+    <tr>
+      <td><strong>Reading the transcript file</strong></td>
+      <td><code>transcript_path</code> is on every payload, so the file is locatable.</td>
+      <td><strong>Deliberately unused.</strong> It lags the live conversation and its format is not a stable public contract. <code>last_assistant_message</code> is the supported route.</td>
+    </tr>
+    <tr>
+      <td><strong>macOS / Linux</strong></td>
+      <td>Portable code — no Win32 APIs, no shelling out, POSIX <code>chmod 0600</code> on the token.</td>
+      <td><strong>Untested anywhere but Windows 11.</strong> Always-on-top levels, notifications and the <code>vscode://</code> fallback are the likely rough edges.</td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <p class="eyebrow"><span class="tag-no">not possible</span></p>
+  <h2>Things it will never do.</h2>
+  <table>
+    <tr><th>Claim</th><th>Why</th></tr>
+    <tr>
+      <td><strong>Know the moment a permission is granted</strong></td>
+      <td><strong>Permission grants are silent — no hook fires.</strong> The order is <code>PreToolUse → PermissionRequest → PostToolUse</code> with nothing between; only denials by the auto-mode classifier get an event. So approving in VS Code leaves the earliest hard evidence at the tool <em>finishing</em>. Mitigated by acknowledgement on focus or on <strong>[Open VS Code]</strong> — never by claiming approval.</td>
+    </tr>
+    <tr>
+      <td><strong>Read Claude Code's in-memory state</strong></td>
+      <td>No API exposes another extension's internals. The VS Code Extension API cannot see inside Claude Code at all. This is the assumption that sinks naive versions of this project.</td>
+    </tr>
+    <tr>
+      <td><strong>Read terminal scrollback</strong></td>
+      <td>There is no supported VS Code API to read a terminal's buffer. Shell integration events don't give you the text.</td>
+    </tr>
+    <tr>
+      <td><strong>Know what Claude is “thinking”</strong></td>
+      <td>No hook fires during model inference. A long gap between tool calls is genuinely opaque — which is why silence dims the bar but never changes its status, and why the honest label is just <code>Thinking…</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Raise the VS Code window from the extension</strong></td>
+      <td>VS Code exposes no API for an extension to bring its own OS window to the front. Raising is done by opening an already-open <em>file</em> via <code>vscode://file/</code> — which is why a real file path matters, and why a folder is never used.</td>
+    </tr>
+    <tr>
+      <td><strong>Detect a hard-killed session</strong></td>
+      <td><code>SessionEnd</code> doesn't fire on <code>kill -9</code>. The session just stops emitting, which is indistinguishable from a long think. Resolved by a TTL, not a guess.</td>
+    </tr>
+    <tr>
+      <td><strong>Approve permissions <span style="color:var(--text-3)">(v1, by choice)</span></strong></td>
+      <td>Mechanically supported — <code>PermissionRequest</code> accepts a decision in the response body — but deliberately not built. It means holding the HTTP response open until you click, blocking that tool call against a 600-second default timeout, and an overlay that can approve tool calls deserves its own threat model. <strong>[ok] acknowledges only.</strong></td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <p class="eyebrow">If you upgrade Claude Code</p>
+  <h2>Re-verify these four.</h2>
+  <ul class="tight">
+    <li><strong><code>SessionStart</code> supports <code>type: "http"</code>.</strong> On 2.1.119, <code>WorktreeCreate</code> is the <em>only</em> event restricted to <code>command</code>/<code>mcp_tool</code>. Earlier builds restricted more.</li>
+    <li><strong>A 2xx body is meaningful.</strong> Text gets injected into Claude's context; JSON is parsed as a decision. The ingest handler returns <code>204</code> with no body, always — a stray log line would silently pollute your conversations.</li>
+    <li><strong>The default HTTP hook timeout is 600 seconds.</strong> Every installed hook carries an explicit short timeout (5 s, and 1 s for <code>SessionEnd</code>, which shares a ~1.5 s budget).</li>
+    <li><strong>Hook failure is non-blocking.</strong> This is the property that makes the whole design acceptable, and it is tested.</li>
+  </ul>
+</section>
+
+<footer>
+  <div class="footer__row">
+    <a href="https://github.com/UtkarshloneyaITG/Sidelong">GitHub</a>
+    <a href="./">Home</a>
+    <a href="install.html">Install</a>
+    <span>Verified against Claude Code 2.1.119 · Windows 11</span>
+  </div>
+</footer>
+
+</div>
+</body>
+</html>
