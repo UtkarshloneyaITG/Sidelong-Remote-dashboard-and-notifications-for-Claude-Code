@@ -3,9 +3,12 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// Our own workspace packages are bundled rather than externalized, so the built
-// main process does not depend on the workspace symlink layout at runtime.
-const internal = ['@agent-watcher/protocol', '@agent-watcher/agent-adapters'];
+// Bundled rather than externalized, so the built main process has NO runtime
+// node_modules at all. That matters twice over: it does not depend on the
+// workspace symlink layout, and packaging does not have to resolve hoisted
+// dependencies out of the monorepo root. `ws` is pure JS (its native accelerators
+// are optional and guarded), so it bundles cleanly.
+const internal = ['@agent-watcher/protocol', '@agent-watcher/agent-adapters', 'ws'];
 
 export default defineConfig({
   main: {

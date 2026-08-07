@@ -1,6 +1,6 @@
 {
   "name": "@agent-watcher/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "The always-on-top overlay: hook receiver, state machine host, and UI.",
   "license": "MIT",
@@ -9,7 +9,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit"
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "dist": "electron-builder --config electron-builder.yml --publish never"
   },
   "dependencies": {
     "@agent-watcher/agent-adapters": "*",
@@ -23,12 +24,14 @@
     "@types/react-dom": "^19.0.1",
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^5.2.0",
-    "electron": "^43.3.0",
+    "electron": "43.3.0",
     "electron-vite": "^5.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "vite": "^7.0.0"
-  }
+    "vite": "^7.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "author": "UtkarshloneyaITG"
 }

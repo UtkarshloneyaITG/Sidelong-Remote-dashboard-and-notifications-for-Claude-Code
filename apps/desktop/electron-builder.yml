@@ -1,0 +1,38 @@
+appId: dev.sidelong.overlay
+productName: Sidelong
+copyright: Copyright (c) 2026 UtkarshloneyaITG
+
+directories:
+  output: ../../release
+  buildResources: resources
+
+# The main process bundles every dependency (see electron.vite.config.ts), so the
+# whole app is out/ plus the icon. No node_modules ship at all.
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+
+win:
+  # portable = a single .exe you can run from anywhere, no install, no admin.
+  # nsis     = a normal installer for people who want a Start-menu entry.
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  # No icon.ico is committed; electron-builder generates one from the 320x320
+  # resources/icon.png, which is above its 256x256 minimum.
+  icon: resources/icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Sidelong-Setup-${version}.${ext}
+
+portable:
+  artifactName: Sidelong-${version}-portable.${ext}
+
+# Unsigned. Windows SmartScreen will warn on first run; see the README.
+forceCodeSigning: false
