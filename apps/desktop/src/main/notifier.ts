@@ -82,7 +82,11 @@ interface Sent {
 export class Notifier {
   private last = new Map<string, Sent>();
 
-  constructor(private readonly onActivate: (sessionId: string) => void) {}
+  constructor(
+    private readonly onActivate: (sessionId: string) => void,
+    /** App mark for the toast. Without it Windows shows the stock Electron icon. */
+    private readonly iconPath?: string,
+  ) {}
 
   /**
    * Called with each new view. Fires only on a genuine status TRANSITION, so a
@@ -120,6 +124,7 @@ export class Notifier {
     const n = new Notification({
       title,
       body,
+      icon: this.iconPath,
       // Permission and failure must not evaporate while you are in another app.
       timeoutType: s.status === 'WAITING_FOR_PERMISSION' || s.status === 'ERROR'
         ? 'never'
