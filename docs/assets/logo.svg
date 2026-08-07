@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sidelong">
+  <title>Sidelong</title>
+  <!--
+    An eye, glancing sideways.
+
+    The pupil is pushed hard to the left until it BREAKS the eye's edge. A
+    centred pupil is a stare, and stares belong to surveillance tools; this is a
+    glance to the edge of vision and back, which is the whole interaction the app
+    is built around — you never turn your head, you flick your eyes.
+
+    An earlier version used the bar's own capsule silhouette with an offset dot.
+    It was abandoned because a capsule containing a circle is universally read as
+    an iOS toggle switch, whatever the fill or stroke.
+
+    Amber is the colour the real bar turns when Claude Code is waiting on you —
+    the one moment this tool exists for.
+  -->
+  <path d="M3 32 Q32 9 61 32 Q32 55 3 32 Z" fill="#F5B544"/>
+  <circle cx="18" cy="32" r="8" fill="#0A0A0C"/>
+</svg>

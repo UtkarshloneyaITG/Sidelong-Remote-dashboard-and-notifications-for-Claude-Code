@@ -1,6 +1,8 @@
 <div align="center">
 
-# Agent Watcher
+<img src="docs/assets/logo.svg" width="92" height="92" alt="Sidelong">
+
+# Sidelong
 
 **Know what Claude Code is doing without switching back to VS Code.**
 
@@ -272,7 +274,7 @@ Global shortcut, default `Ctrl+Shift+Space`: hidden → show, expanded → minim
 
 > [!WARNING]
 > This default collides with VS Code's **Trigger Parameter Hints**. A global shortcut wins,
-> so VS Code loses that binding while Agent Watcher runs. Change `shortcut` in the config —
+> so VS Code loses that binding while Sidelong runs. Change `shortcut` in the config —
 > `Ctrl+Alt+Space` is unbound on a stock setup.
 
 🟢 Hooks listening · 🔴 Receiver down · ⚫ VS Code bridge not connected · **no session** ·

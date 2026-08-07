@@ -32,6 +32,13 @@ import * as hooks from './hooks-installer.js';
 app.setName('agent-watcher-desktop');
 
 /**
+ * The app mark. Windows toasts fall back to the stock Electron icon without it,
+ * which is the one place the branding is actually seen -- the overlay window
+ * itself is frameless and skips the taskbar.
+ */
+export const ICON_PATH = join(app.getAppPath(), 'resources', 'icon.png');
+
+/**
  * ONE size for the minimized bar, always.
  *
  * It used to resize itself to fit its content, which meant the window jumped
@@ -74,6 +81,7 @@ function createWindow(): BrowserWindow {
 
   const w = new BrowserWindow({
     ...size,
+    icon: ICON_PATH,
     x: cfg.bounds?.x ?? area.x + area.width - size.width - 24,
     y: cfg.bounds?.y ?? area.y + 24,
     frame: false,
@@ -415,7 +423,7 @@ if (!app.requestSingleInstanceLock()) {
     notifier = new Notifier(() => {
       win?.showInactive();
       setExpanded(true);
-    });
+    }, ICON_PATH);
     registerShortcut();
     setInterval(pushView, VIEW_TICK_MS);
     pushView();

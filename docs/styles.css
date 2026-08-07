@@ -131,12 +131,16 @@ body::after {
 .nav a { color: var(--text-3); text-decoration: none; transition: color 0.18s; }
 .nav a:hover, .nav a[aria-current="page"] { color: var(--amber); }
 .nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-family: var(--display);
   font-size: 21px;
   letter-spacing: 0;
   color: var(--text);
   margin-right: auto;
 }
+.nav__brand img { display: block; }
 .nav__brand:hover { color: var(--text); }
 
 /* ── type ──────────────────────────────────────────────────────────────── */
