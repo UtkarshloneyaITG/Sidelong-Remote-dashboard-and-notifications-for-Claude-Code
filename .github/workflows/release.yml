@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build Windows binaries
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Gate the release on the same checks CI runs. A tag should never produce
+      # a binary that would have failed a pull request.
+      - run: npm run typecheck
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Package installer + portable
+        run: npm run dist -w @agent-watcher/desktop
+
+      - name: Package the VS Code extension
+        run: npm run package -w agent-watcher-bridge
+
+      - name: Attach artifacts to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          files: |
+            release/Sidelong-Setup-*.exe
+            release/Sidelong-*-portable.exe
+            extensions/vscode-bridge/agent-watcher-bridge.vsix

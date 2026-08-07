@@ -14,9 +14,10 @@ when it is silently waiting on a permission prompt.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-hooks-D97757?logo=anthropic&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-58%20passing-3FB950)
-![Vulnerabilities](https://img.shields.io/badge/npm%20audit-0-3FB950)
-![License](https://img.shields.io/badge/license-MIT-F5B544)
+[![CI](https://github.com/UtkarshloneyaITG/Sidelong/actions/workflows/ci.yml/badge.svg)](https://github.com/UtkarshloneyaITG/Sidelong/actions/workflows/ci.yml)
+[![Release](https://github.com/UtkarshloneyaITG/Sidelong/actions/workflows/release.yml/badge.svg)](https://github.com/UtkarshloneyaITG/Sidelong/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/UtkarshloneyaITG/Sidelong?color=F5B544)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/UtkarshloneyaITG/Sidelong/total?color=F5B544)](https://github.com/UtkarshloneyaITG/Sidelong/releases)
 
 [Why](#why-this-exists) · [What you get](#what-you-get) · [Architecture](#architecture) · [Quick start](#quick-start) · [Using it](#using-it) · [Capabilities](#capabilities) · [Security](#security)
 
@@ -157,7 +158,26 @@ state, no duplication.
 > the information we need and no payload field is documented to carry it. Costs ~40 settings
 > entries, removes all guessing.
 
-## Quick start
+## Download
+
+| | |
+|---|---|
+| **[Sidelong-Setup-x.y.z.exe](https://github.com/UtkarshloneyaITG/Sidelong/releases/latest)** | Windows installer. Start-menu entry, per-user, no admin. |
+| **[Sidelong-x.y.z-portable.exe](https://github.com/UtkarshloneyaITG/Sidelong/releases/latest)** | Single file, run it from anywhere. Nothing installed. |
+| **[agent-watcher-bridge.vsix](https://github.com/UtkarshloneyaITG/Sidelong/releases/latest)** | Optional VS Code extension. |
+
+> [!NOTE]
+> The binaries are **unsigned** — a code-signing certificate costs a few hundred
+> dollars a year. Windows SmartScreen will show "Windows protected your PC" on first
+> run; choose **More info → Run anyway**. Every release is built by the
+> [Release workflow](.github/workflows/release.yml) from tagged source on GitHub's
+> runners, so you can check exactly what produced the file you downloaded — or build
+> it yourself with `npm run dist -w @agent-watcher/desktop`.
+
+After installing, launch it and run `node tools/install-hooks.mjs install` from a clone
+to wire up the hooks — or use the **Hooks** panel inside the app, which needs no clone.
+
+## Quick start (from source)
 
 Prerequisites: **Node 20+**, **Claude Code with HTTP hook support** (verified on `2.1.119` —
 check with `claude --version`). No API key. **No `.env` file** — the port and token are
@@ -375,7 +395,18 @@ prompt text never survive into state · hooks merge without clobbering, uninstal
 install is idempotent, drift is detected.
 
 > [!IMPORTANT]
-> **The kill-the-app test.** The property that makes this design acceptable is that closing
+> **Every claim here is checked by CI, not asserted.** [`ci.yml`](.github/workflows/ci.yml)
+runs typecheck, the full test suite and a production build on **Ubuntu, Windows and macOS**
+for every push and pull request, plus `npm audit --audit-level=high` as a job that fails the
+run. The badges at the top are live workflow status, not hardcoded numbers — if the suite
+breaks, the badge goes red on its own. Releases run the same checks before a binary is
+built, so a tag can never ship something that would have failed a PR.
+
+*The macOS and Linux jobs prove it **builds** there. They do not prove the overlay
+**behaves** there — always-on-top, notifications and focus detection are still only
+verified by hand on Windows 11.*
+
+**The kill-the-app test.** The property that makes this design acceptable is that closing
 > the overlay must never affect your coding session. Verified directly: app killed
 > mid-session, port confirmed dead (`ECONNREFUSED`), then Claude Code tool calls with 11
 > hooks firing at the dead server completed in **39 ms and 67 ms** — normal speed. App

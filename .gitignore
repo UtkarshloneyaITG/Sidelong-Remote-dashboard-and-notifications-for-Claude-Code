@@ -12,3 +12,6 @@ fixtures/captured*.jsonl
 
 # Backups the installer takes before touching a settings file.
 *.agent-watcher-backup
+
+# electron-builder output
+release/
