@@ -1,0 +1,10 @@
+{"matcher":"startup","event":{"session_id":"s-life-1","transcript_path":"C:\\Users\\dev\\.claude\\projects\\demo\\s-life-1.jsonl","cwd":"D:\\demo","permission_mode":"default","effort":{"level":"high"},"hook_event_name":"SessionStart","source":"startup"}}
+{"event":{"session_id":"s-life-1","cwd":"D:\\demo","prompt_id":"p-3","hook_event_name":"UserPromptSubmit","prompt":"refactor the parser"}}
+{"matcher":"*","event":{"session_id":"s-life-1","cwd":"D:\\demo","prompt_id":"p-3","hook_event_name":"PreToolUse","tool_name":"Grep","tool_input":{"pattern":"parseToken","output_mode":"files_with_matches"},"tool_use_id":"toolu_03A"}}
+{"matcher":"*","event":{"session_id":"s-life-1","cwd":"D:\\demo","prompt_id":"p-3","hook_event_name":"SubagentStart","agent_id":"a-1","agent_type":"Explore"}}
+{"matcher":"*","event":{"session_id":"s-life-1","cwd":"D:\\demo","prompt_id":"p-3","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"D:\\demo\\src\\deep\\nested\\thing.ts"},"tool_use_id":"toolu_03B","agent_id":"a-1","agent_type":"Explore"}}
+{"matcher":"*","event":{"session_id":"s-life-1","cwd":"D:\\demo","prompt_id":"p-3","hook_event_name":"SubagentStop","agent_id":"a-1","agent_type":"Explore"}}
+{"matcher":"auto","event":{"session_id":"s-life-1","cwd":"D:\\demo","prompt_id":"p-3","hook_event_name":"PreCompact"}}
+{"matcher":"auto","event":{"session_id":"s-life-1","cwd":"D:\\demo","prompt_id":"p-3","hook_event_name":"PostCompact"}}
+{"matcher":"rate_limit","event":{"session_id":"s-life-1","cwd":"D:\\demo","prompt_id":"p-3","hook_event_name":"StopFailure","reason":"rate_limit","error":"Rate limit exceeded. Try again in 4 minutes."}}
+{"matcher":"logout","event":{"session_id":"s-life-1","cwd":"D:\\demo","hook_event_name":"SessionEnd","reason":"logout"}}

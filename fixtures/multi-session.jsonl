@@ -1,0 +1,8 @@
+{"matcher":"startup","event":{"session_id":"s-A","cwd":"D:\\projectA","hook_event_name":"SessionStart","source":"startup"}}
+{"matcher":"startup","event":{"session_id":"s-B","cwd":"D:\\projectB","hook_event_name":"SessionStart","source":"startup"}}
+{"event":{"session_id":"s-A","cwd":"D:\\projectA","hook_event_name":"UserPromptSubmit","prompt":"fix the build"}}
+{"event":{"session_id":"s-B","cwd":"D:\\projectB","hook_event_name":"UserPromptSubmit","prompt":"write the docs"}}
+{"matcher":"*","event":{"session_id":"s-A","cwd":"D:\\projectA","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf dist && npm run build"},"tool_use_id":"toolu_A1"}}
+{"matcher":"*","event":{"session_id":"s-A","cwd":"D:\\projectA","hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rm -rf dist && npm run build"}}}
+{"matcher":"*","event":{"session_id":"s-B","cwd":"D:\\projectB","hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"D:\\projectB\\README.md","content":"# Docs"},"tool_use_id":"toolu_B1"}}
+{"matcher":"*","event":{"session_id":"s-B","cwd":"D:\\projectB","hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"D:\\projectB\\README.md"},"tool_use_id":"toolu_B1"}}

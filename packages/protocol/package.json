@@ -1,0 +1,24 @@
+{
+  "name": "@agent-watcher/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared types, the pure state reducer, and hook-config rules. ZERO runtime dependencies, on purpose: imported by the Electron main process, the renderer, and the VS Code extension.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test \"test/*.test.js\""
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^22.9.0"
+  }
+}

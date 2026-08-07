@@ -1,0 +1,14 @@
+node_modules/
+dist/
+out/
+*.vsix
+*.tsbuildinfo
+
+# Raw hook captures. NEVER commit these: tool_input carries whole file contents,
+# full command strings, and prompt text. The curated files in fixtures/ were
+# hand-reviewed; anything else you capture is yours to keep local.
+fixtures/raw*.jsonl
+fixtures/captured*.jsonl
+
+# Backups the installer takes before touching a settings file.
+*.agent-watcher-backup
