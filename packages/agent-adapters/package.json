@@ -3,7 +3,7 @@
   "version": "0.1.4",
   "private": true,
   "type": "module",
-  "description": "AgentAdapter interface plus the Claude Code adapter. Keeps the overlay agnostic about which agent it is watching.",
+  "description": "AgentAdapter interface plus the Claude Code adapter. Claude Code only — one implementation, and no other agent is supported.",
   "license": "MIT",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

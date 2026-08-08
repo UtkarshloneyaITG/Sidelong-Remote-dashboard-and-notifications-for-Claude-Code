@@ -171,6 +171,12 @@
     changed, errors, completion — is the same signal put to work.
   </p>
 
+  <div class="note note--warn">
+    <p><strong>Claude Code only.</strong> Everything here is built on Claude Code's HTTP hook
+    system, which is specific to Claude Code. <strong>Codex, Gemini and other CLI agents do
+    not work</strong> — they emit no such events. Tested, not assumed.</p>
+  </div>
+
   <div class="note">
     <p><strong>Why not just read it from the VS Code API?</strong> Because it cannot be done.
     The Extension API cannot see inside another extension, terminal scrollback is not readable

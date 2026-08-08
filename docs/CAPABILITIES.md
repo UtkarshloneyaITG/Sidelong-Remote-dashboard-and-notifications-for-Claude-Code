@@ -49,6 +49,7 @@ A limitation documented here is worth more than a capability faked.
 
 | Claim | Why |
 |---|---|
+| **Watching Codex, Gemini, or any agent other than Claude Code** | **Not supported, and not close to supported.** Everything here is built on Claude Code's HTTP hook system, which is specific to Claude Code — other CLI agents simply do not emit these events. The repository contains an `AgentAdapter` interface with exactly **one** implementation; that is an internal seam that keeps the registry and the multi-session UI tidy, **not** a plug-in point that makes another agent work. Supporting one would mean finding a whole different observation mechanism for it, not writing a small adapter. Tested against Codex: it does not work. |
 | **Reading Claude Code's in-memory state** | No API exposes another extension's internals. The VS Code Extension API cannot see inside the Claude Code extension at all. This is the assumption that sinks naive versions of this project. |
 | **Reading terminal scrollback** | There is no supported VS Code API to read a terminal's buffer. `Terminal.processId` and shell integration events do not give you the text. |
 | **Knowing what Claude is "thinking" between tool calls** | No hook fires during model inference. A long gap between `PostToolUse` and the next `PreToolUse` is genuinely opaque — which is why a long silence dims the overlay but never changes its status. |

@@ -9,6 +9,25 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **Removed the implication that other agents are supported.** The
+  `agent-adapters` package described itself as keeping the overlay "agnostic
+  about which agent it is watching", and its header offered adding a Codex or
+  Gemini adapter as "a new file plus one `register()` call". Both read as
+  multi-agent support. They were wrong: Codex was tested and does not work.
+
+  Everything here depends on Claude Code's HTTP hook system, which is specific to
+  Claude Code — other CLI agents emit no such events, so supporting one would
+  mean a completely different observation mechanism, not a small adapter. The
+  `AgentAdapter` interface has exactly one implementation and is an internal seam,
+  not a plug-in point. Now stated as such in the README, the docs site, the
+  capability ledger and the package itself.
+
+---
+
 ## [0.1.4] — 2026-08-08
 
 ### Fixed

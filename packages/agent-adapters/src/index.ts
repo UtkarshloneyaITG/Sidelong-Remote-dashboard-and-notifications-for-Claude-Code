@@ -1,15 +1,22 @@
 /**
  * Agent adapters.
  *
- * The overlay renders a LIST of agents even though V1 ships one, so adding a
- * Codex or Gemini adapter later is a new file here plus one `register()` call --
- * not a change to the UI or to the state machine.
+ * SCOPE: Claude Code, and only Claude Code. There is exactly one implementation
+ * of this interface and no other agent is supported or has been made to work.
+ *
+ * This is an internal seam, NOT a capability. Do not read it as "works with any
+ * agent" -- the entire design depends on Claude Code's HTTP hook system, which
+ * is specific to Claude Code. Other CLI agents do not emit these events, so
+ * supporting one would mean finding a completely different observation
+ * mechanism for it, not writing a small adapter against this interface. The
+ * abstraction exists because the registry and the merged-state handling are
+ * genuinely simpler expressed this way, and it keeps the UI from hardcoding a
+ * single-session layout.
  *
  * An adapter owns whatever source its agent exposes. Claude Code's source is the
  * HTTP hook receiver, which the Electron main process owns because the port must
  * be fixed and shared; so `ClaudeCodeAdapter.start()/stop()` are just readiness
- * flags and events arrive through `ingest()`. A future adapter that tails a log
- * file or watches a socket would do that work in `start()`.
+ * flags and events arrive through `ingest()`.
  */
 
 import {

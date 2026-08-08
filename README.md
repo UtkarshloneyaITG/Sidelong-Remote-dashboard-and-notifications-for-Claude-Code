@@ -71,6 +71,13 @@ stops, and you find out when you happen to look. Multiply that by a dozen times 
 | **Long silences don't lie** | A long build or a thinking model dims the bar — it never flips to "error" or "idle" on a timeout. |
 | **Zero risk to your session** | Hook failures are non-blocking by design. Killing the overlay cannot affect Claude Code — measured, not assumed. |
 
+> [!IMPORTANT]
+> **Claude Code only.** Everything here is built on Claude Code's HTTP hook system, which
+> is specific to Claude Code. **Codex, Gemini and other CLI agents do not work** — they emit
+> no such events, and this has been tested rather than assumed. The repository contains an
+> `AgentAdapter` interface with exactly one implementation; that is an internal seam, not a
+> plug-in point that makes another agent work.
+
 > [!NOTE]
 > **What it deliberately does not do.** It never approves or denies anything (`[ok]` means
 > *seen it*). It never invents a state — every pixel traces to a received event. It never
@@ -125,7 +132,7 @@ stops, and you find out when you happen to look. Multiply that by a dozen times 
 |---|-----------|------|------|-------|
 | 1 | **Overlay — main + renderer** | `apps/desktop/` | 47821 | Electron 43 · React 19 · Vite 7 · Tailwind v4 |
 | 2 | **Protocol — types + reducer** | `packages/protocol/` | — | TypeScript, **zero runtime deps** |
-| 3 | **Agent adapters** | `packages/agent-adapters/` | — | TypeScript |
+| 3 | **Agent adapter** — Claude Code only | `packages/agent-adapters/` | — | TypeScript |
 | 4 | **VS Code bridge** | `extensions/vscode-bridge/` | ws `:47821/bridge` | VS Code API · `ws` |
 | 5 | **Tools — capture · replay · installer** | `tools/` | — | Node ESM, zero deps |
 
