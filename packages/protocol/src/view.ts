@@ -155,6 +155,15 @@ export const permissionKeyOf = (s: SessionState): string | undefined =>
  * to the model. No hook fires during inference, so this is the honest name for
  * an interval we can bound but not see into.
  */
+/** "3m" / "45s" / "1h 4m" — a gap you read, not parse. */
+export function humanGap(ms: number): string {
+  const sec = Math.max(0, Math.round(ms / 1000));
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  return `${Math.floor(min / 60)}h ${min % 60}m`;
+}
+
 export function headlineOf(s: SessionState): string {
   if (s.pendingPermission) return s.pendingPermission.detail;
   const running = [...s.activity].reverse().find((a) => a.status === 'running');
@@ -173,15 +182,35 @@ export function toSessionView(
 ): SessionView {
   const terminal = s.status === 'COMPLETED' || s.status === 'ERROR' || s.status === 'DISCONNECTED';
   const permissionKey = permissionKeyOf(s);
+  const toolRunning = s.activity.some((a) => a.status === 'running');
+  const stale = isStale(s, now, staleMs);
+
+  /**
+   * Interrupting Claude Code fires NOTHING -- measured, not assumed: over 168
+   * captured events, three of six turns ended with no event whatsoever, and one
+   * tool call produced a PreToolUse with no PostToolUse or PostToolUseFailure.
+   * So an interrupt is undetectable and the bar would otherwise keep asserting
+   * "Thinking…" or a tool line indefinitely.
+   *
+   * We cannot say it stopped. We CAN stop claiming it is still working, and say
+   * exactly what we know: how long it has been since anything arrived.
+   *
+   * Only when no tool is running. Silence during a tool call is completely
+   * normal -- a long build emits nothing between PreToolUse and PostToolUse --
+   * whereas silence with nothing running is model inference, which does not
+   * legitimately run for minutes.
+   */
+  const headline = stale && !toolRunning && s.status === 'WORKING' && !s.pendingPermission
+    ? `No events for ${humanGap(now - s.lastActivityAt)}`
+    : headlineOf(s);
+
   return {
     sessionId: s.sessionId,
     status: s.status,
     severity: severityOf(s.status),
     message: s.message,
-    headline: headlineOf(s),
-    headlineIsCommand: Boolean(
-      s.pendingPermission || s.activity.some((a) => a.status === 'running'),
-    ),
+    headline,
+    headlineIsCommand: Boolean(s.pendingPermission || toolRunning),
     details: s.details,
     workspace: s.workspace,
     project: projectName(s.workspace),
@@ -205,7 +234,7 @@ export function toSessionView(
     error: s.error,
     subagents: s.subagents,
     compacting: s.compacting,
-    stale: isStale(s, now, staleMs),
+    stale,
     lastActivityAt: s.lastActivityAt,
     bridge: bridgeMatches(s.workspace, bridge) ? bridge : undefined,
   };

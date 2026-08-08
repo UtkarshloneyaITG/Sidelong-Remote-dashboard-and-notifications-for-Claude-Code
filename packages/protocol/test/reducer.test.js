@@ -7,7 +7,7 @@ import { loadFixture } from '../../../tools/replay.mjs';
 import {
   absoluteFile,
   buildHookConfig, buildView, describePermission, describeTool, findDrift, allowlistProblem,
-  PERMISSION_GRACE_MS,
+  PERMISSION_GRACE_MS, humanGap,
   initialState, isStale, mergeHooks, reduce, reduceAll, removeHooks, severityOf, shortPath,
   truncate, parseBridgeMessage, bridgeMatches,
 } from '../dist/index.js';
@@ -488,15 +488,62 @@ test('the headline always reports real work, never a bare status label', () => {
   assert.equal(seen.headline, 'Run `npm install`?');
   assert.notEqual(seen.headline, 'Claude needs your attention');
 
-  // turn open, nothing running -> Thinking
+  // turn open, nothing running -> Thinking. Uses a `now` INSIDE the stale window;
+  // past it the headline deliberately switches to "No events for …" (see below).
   const thinking = reduceAll(initialState, fx('tool-activity.jsonl').slice(0, 3));
+  const soon = only(thinking).lastActivityAt + 20_000;
   assert.equal(thinking.sessions['s-tool-1'].activity.some((x) => x.status === 'running'), false);
-  assert.equal(at(thinking, 1_700_000_100_000).headline, 'Thinking…');
-  assert.equal(at(thinking, 1_700_000_100_000).headlineIsCommand, false);
+  assert.equal(at(thinking, soon).headline, 'Thinking…');
+  assert.equal(at(thinking, soon).headlineIsCommand, false);
 
   // finished -> the summary, not "Thinking"
   const done = run('tool-activity.jsonl');
   assert.match(at(done, 1_700_000_100_000).headline, /^Added a \/health endpoint/);
+});
+
+// Measured, not assumed: interrupting Claude Code fires NOTHING. Across 168
+// captured events, 3 of 6 turns ended with no event at all, and one tool call
+// produced a PreToolUse with no PostToolUse or PostToolUseFailure. The bar cannot
+// detect an interrupt -- so it must stop asserting that work is still happening.
+test('a silent session stops claiming it is still working', () => {
+  const opts = { staleMs: 90_000, bridge: { status: 'disconnected' }, ingestReady: true };
+  // UserPromptSubmit + PreToolUse + PostToolUse -> turn open, nothing running
+  const thinking = reduceAll(initialState, fx('tool-activity.jsonl').slice(0, 3));
+  const last = only(thinking).lastActivityAt;
+
+  const fresh = buildView(thinking, { ...opts, now: last + 5_000 }).active;
+  assert.equal(fresh.headline, 'Thinking…', 'a short gap is normal');
+
+  const silent = buildView(thinking, { ...opts, now: last + 4 * 60_000 }).active;
+  assert.equal(silent.headline, 'No events for 4m');
+  assert.equal(silent.status, 'WORKING', 'never invents a terminal state');
+  assert.equal(silent.stale, true);
+});
+
+test('silence WHILE a tool runs is normal and must not be relabelled', () => {
+  // A long build emits nothing between PreToolUse and PostToolUse, so the tool
+  // line has to survive. Relabelling it would break every slow command.
+  const opts = { staleMs: 90_000, bridge: { status: 'disconnected' }, ingestReady: true };
+  const running = reduceAll(initialState, fx('tool-activity.jsonl').slice(0, 6)); // Bash running
+  const last = only(running).lastActivityAt;
+  const view = buildView(running, { ...opts, now: last + 20 * 60_000 }).active;
+  assert.equal(view.headline, 'Running npm test', 'still the real command');
+  assert.equal(view.headlineIsCommand, true);
+});
+
+test('a pending permission is never relabelled as silence', () => {
+  const opts = { staleMs: 90_000, bridge: { status: 'disconnected' }, ingestReady: true };
+  const blocked = reduceAll(initialState, fx('permission.jsonl').slice(0, 3));
+  const at = only(blocked).pendingPermission.at;
+  const view = buildView(blocked, { ...opts, now: at + 30 * 60_000 }).active;
+  assert.equal(view.headline, 'Run `npm install`?', 'waiting for a human is not silence');
+});
+
+test('humanGap reads as a duration', () => {
+  assert.equal(humanGap(4_000), '4s');
+  assert.equal(humanGap(95_000), '1m');
+  assert.equal(humanGap(3 * 60_000), '3m');
+  assert.equal(humanGap(64 * 60_000), '1h 4m');
 });
 
 test('severity is derived from status in exactly one place', () => {

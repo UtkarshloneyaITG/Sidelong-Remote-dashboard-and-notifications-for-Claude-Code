@@ -9,6 +9,26 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **The bar kept asserting live work after you interrupted Claude.** Enabling the
+  new `debugLog` and capturing 168 real events settled what the hooks reference
+  does not document: **interrupting fires nothing at all** — 3 of 6 turns ended
+  with no event whatsoever, and one tool call produced a `PreToolUse` with no
+  matching `PostToolUse`. An interrupt is therefore undetectable.
+
+  So the bar no longer pretends. Once a session with **no tool running** has been
+  silent past the stale threshold, the headline becomes `No events for 4m` rather
+  than continuing to claim `Thinking…`. It still never invents a terminal state,
+  because it genuinely does not know the turn ended. Silence *while a tool is
+  running* is deliberately untouched — a long build emits nothing between
+  `PreToolUse` and `PostToolUse`, and relabelling that would break every slow
+  command.
+
+---
+
 ## [0.1.3] — 2026-08-08
 
 ### Added
