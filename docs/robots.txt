@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://utkarshloneyaitg.github.io/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/sitemap.xml
+Sitemap: https://utkarshloneyaitg.github.io/Sidelong/sitemap.xml

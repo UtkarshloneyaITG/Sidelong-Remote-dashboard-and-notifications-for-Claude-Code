@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sidelong — see what Claude Code is doing without leaving your app</title>
 <meta name="description" content="An always-on-top bar showing what every Claude Code session is doing, and when it is silently waiting on a permission prompt. Built on Claude Code's hook system, not screen scraping. Local-only, no API key.">
-<link rel="canonical" href="https://utkarshloneyaitg.github.io/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/">
+<link rel="canonical" href="https://utkarshloneyaitg.github.io/Sidelong/">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta name="theme-color" content="#08080a">
 
@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="Sidelong">
 <meta property="og:title" content="Sidelong — see what Claude Code is doing without leaving your app">
 <meta property="og:description" content="An always-on-top bar showing what every Claude Code session is doing, and when it is silently waiting on a permission prompt. Hook-driven. Local-only. No API key.">
-<meta property="og:url" content="https://utkarshloneyaitg.github.io/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/">
-<meta property="og:image" content="https://utkarshloneyaitg.github.io/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/assets/bar-permission.png">
+<meta property="og:url" content="https://utkarshloneyaitg.github.io/Sidelong/">
+<meta property="og:image" content="https://utkarshloneyaitg.github.io/Sidelong/assets/bar-permission.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Sidelong — a status bar for Claude Code">
 <meta name="twitter:description" content="Know when Claude Code is waiting on you. Hook-driven, local-only, no API key.">
-<meta name="twitter:image" content="https://utkarshloneyaitg.github.io/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/assets/bar-permission.png">
+<meta name="twitter:image" content="https://utkarshloneyaitg.github.io/Sidelong/assets/bar-permission.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,8 +33,8 @@
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Windows 11",
   "description": "An always-on-top status bar showing the live state of every Claude Code session, driven by Claude Code's HTTP hook system. Surfaces permission prompts that would otherwise wait silently.",
-  "url": "https://utkarshloneyaitg.github.io/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/",
-  "codeRepository": "https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code",
+  "url": "https://utkarshloneyaitg.github.io/Sidelong/",
+  "codeRepository": "https://github.com/UtkarshloneyaITG/Sidelong",
   "programmingLanguage": ["TypeScript", "JavaScript"],
   "license": "https://opensource.org/licenses/MIT",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
@@ -58,7 +58,7 @@
   <a href="#how">How it works</a>
   <a href="install.html">Install</a>
   <a href="capabilities.html">Capabilities</a>
-  <a href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code">GitHub&nbsp;↗</a>
+  <a href="https://github.com/UtkarshloneyaITG/Sidelong">GitHub&nbsp;↗</a>
 </nav>
 
 <header class="hero">
@@ -97,7 +97,7 @@
     <!-- Falls back to the releases page with JS off; the script below upgrades it
          to a direct .exe link for whatever the newest release actually is. -->
     <a class="btn btn--solid" id="dl-main"
-       href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest">
+       href="https://github.com/UtkarshloneyaITG/Sidelong/releases/latest">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"
            stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 1.8v8.4M4.4 6.8 8 10.4l3.6-3.6M2.2 13.4h11.6"/>
@@ -125,7 +125,7 @@
       <p>Start-menu and desktop shortcuts, per-user, no admin rights needed.</p>
       <p style="margin-top:14px">
         <a class="btn btn--solid" id="dl-setup"
-           href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest">Setup&nbsp;.exe</a>
+           href="https://github.com/UtkarshloneyaITG/Sidelong/releases/latest">Setup&nbsp;.exe</a>
       </p>
     </div>
     <div class="cell">
@@ -134,7 +134,7 @@
       <p>One file. Run it from anywhere, leaves nothing behind but its config.</p>
       <p style="margin-top:14px">
         <a class="btn btn--ghost" id="dl-portable"
-           href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest">Portable&nbsp;.exe</a>
+           href="https://github.com/UtkarshloneyaITG/Sidelong/releases/latest">Portable&nbsp;.exe</a>
       </p>
     </div>
     <div class="cell">
@@ -143,7 +143,7 @@
       <p>Focus-aware notifications, git branch and diagnostics. Not required.</p>
       <p style="margin-top:14px">
         <a class="btn btn--ghost" id="dl-vsix"
-           href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest">.vsix</a>
+           href="https://github.com/UtkarshloneyaITG/Sidelong/releases/latest">.vsix</a>
       </p>
     </div>
   </div>
@@ -313,10 +313,10 @@ node tools/install-hooks.mjs status        <span class="c"># confirm</span></cod
 
 <footer>
   <div class="footer__row">
-    <a href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code">GitHub</a>
+    <a href="https://github.com/UtkarshloneyaITG/Sidelong">GitHub</a>
     <a href="install.html">Install</a>
     <a href="capabilities.html">Capabilities</a>
-    <a href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/blob/main/LICENSE">MIT</a>
+    <a href="https://github.com/UtkarshloneyaITG/Sidelong/blob/main/LICENSE">MIT</a>
     <span>Verified against Claude Code 2.1.119 · Windows 11</span>
   </div>
 </footer>
@@ -336,7 +336,7 @@ node tools/install-hooks.mjs status        <span class="c"># confirm</span></cod
   stale on the next tag.
 */
 (function () {
-  var REPO = 'UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code';
+  var REPO = 'UtkarshloneyaITG/Sidelong';
   var meta = document.getElementById('dl-meta');
 
   function mb(n) { return (n / 1048576).toFixed(0) + ' MB'; }
