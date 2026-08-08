@@ -32,6 +32,26 @@ const SEVERITY: Record<Status, Severity> = {
 
 export const severityOf = (status: Status): Severity => SEVERITY[status] ?? 'neutral';
 
+/**
+ * How long a permission prompt must SURVIVE before it counts as real.
+ *
+ * `PermissionRequest` fires even when the request is about to be auto-approved;
+ * the approval lands milliseconds later and the prompt clears. Without this
+ * grace period that flicker fired a desktop notification, which then sat on
+ * screen telling you to open VS Code for a command that had already run.
+ *
+ * Keyed on survival rather than on `permission_mode`, because mode is not a
+ * reliable proxy: `acceptEdits` auto-approves edits but still genuinely prompts
+ * for Bash, and suppressing those would hide the single state this app exists
+ * for. A real prompt waits for a human and sails past this threshold; an
+ * auto-approved one never reaches it.
+ *
+ * Lives here rather than in view.ts so the reducer can use it too -- it decides
+ * which prompts count toward blocked time -- without a circular import.
+ * Well under the "surface it in one second" bar.
+ */
+export const PERMISSION_GRACE_MS = 700;
+
 export type ActivityStatus = 'running' | 'done' | 'failed';
 
 export interface Activity {
@@ -88,6 +108,15 @@ export interface SessionState {
   lastFileAbs?: string;
   pendingPermission?: PendingPermission;
   error?: { kind: string; detail: string };
+  /**
+   * Total time this session has spent genuinely blocked on a permission prompt,
+   * accumulated across turns. Only prompts that outlived PERMISSION_GRACE_MS
+   * count — an auto-approved one never waited on you.
+   *
+   * This is the one number that measures the problem the app exists to solve,
+   * and nothing else can compute it.
+   */
+  blockedMs: number;
   /** Count of subagents currently running. */
   subagents: number;
   /** True while a context compaction is in flight -- explains a long silence. */

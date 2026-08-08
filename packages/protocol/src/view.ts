@@ -6,7 +6,7 @@
  * Built in exactly one place so `severity` can never drift from `status`.
  */
 
-import { severityOf } from './state.js';
+import { PERMISSION_GRACE_MS, severityOf } from './state.js';
 import type { Activity, SessionState, Severity, Status, WatcherState } from './state.js';
 import { isStale } from './reducer.js';
 
@@ -70,6 +70,8 @@ export interface SessionView {
    */
   autoRunning: boolean;
   error?: SessionState['error'];
+  /** Time this session genuinely spent waiting on you. See SessionState.blockedMs. */
+  blockedMs: number;
   subagents: number;
   compacting: boolean;
   stale: boolean;
@@ -91,6 +93,12 @@ export interface OverlayView {
   ingestReady: boolean;
   /** Set when the installed hook config no longer matches this app's port/token. */
   hookConfigDrift?: string;
+  /**
+   * Total time today that sessions spent blocked waiting on you, accumulated by
+   * the main process across sessions and restarts. The one number that measures
+   * the problem this app exists to solve.
+   */
+  blockedTodayMs?: number;
   now: number;
 }
 
@@ -115,24 +123,9 @@ export function bridgeMatches(cwd: string | undefined, bridge: BridgeInfo): bool
 /** Permission modes in which Claude runs at least some tools without prompting. */
 const AUTO_MODES = new Set(['acceptEdits', 'auto', 'dontAsk', 'bypassPermissions']);
 
-/**
- * How long a permission prompt must SURVIVE before it is treated as something
- * you have to act on.
- *
- * `PermissionRequest` fires even when the request is about to be auto-approved;
- * the approval lands milliseconds later and the prompt clears. Without this
- * grace period that flicker still fired a desktop notification, which then sat
- * on screen telling you to open VS Code for a command that had already run.
- *
- * Keyed on survival rather than on `permission_mode`, because mode is not a
- * reliable proxy: `acceptEdits` auto-approves edits but still genuinely prompts
- * for Bash, and suppressing those would hide the single state this app exists
- * for. A real prompt waits for a human and sails past this threshold; an
- * auto-approved one never reaches it.
- *
- * Well under the "surface it in one second" bar.
- */
-export const PERMISSION_GRACE_MS = 700;
+// PERMISSION_GRACE_MS now lives in state.ts, because the reducer needs it to
+// decide which prompts count toward blocked time. Re-exported from the package
+// root via index.ts, so importers are unaffected.
 
 export const permissionKeyOf = (s: SessionState): string | undefined =>
   s.pendingPermission ? `${s.pendingPermission.tool}:${s.pendingPermission.at}` : undefined;
@@ -232,6 +225,7 @@ export function toSessionView(
     ),
     autoRunning: s.status === 'WORKING' && AUTO_MODES.has(s.permissionMode ?? ''),
     error: s.error,
+    blockedMs: s.blockedMs,
     subagents: s.subagents,
     compacting: s.compacting,
     stale,
@@ -250,6 +244,8 @@ export function buildView(
     hookConfigDrift?: string;
     /** sessionId -> the permission key you already clicked [ok] on. */
     acknowledged?: Record<string, string>;
+    /** Today's blocked-on-you total, banked by the main process. */
+    blockedTodayMs?: number;
   },
 ): OverlayView {
   const sessions = Object.values(state.sessions)
@@ -271,6 +267,7 @@ export function buildView(
     bridge: opts.bridge,
     ingestReady: opts.ingestReady,
     hookConfigDrift: opts.hookConfigDrift,
+    blockedTodayMs: opts.blockedTodayMs,
     now: opts.now,
   };
 }

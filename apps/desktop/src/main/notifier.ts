@@ -84,6 +84,8 @@ export class Notifier {
 
   constructor(
     private readonly onActivate: (sessionId: string) => void,
+    /** Fired by the toast's action button — focuses the editor directly. */
+    private readonly onOpenEditor: (sessionId: string) => void,
     /** App mark for the toast. Without it Windows shows the stock Electron icon. */
     private readonly iconPath?: string,
   ) {}
@@ -121,9 +123,16 @@ export class Notifier {
     if (focused) return;
 
     const { title, body } = format(s);
+    // Action buttons ARE supported on Windows (macOS additionally needs the app
+    // signed with an `alert` NSUserNotificationAlertStyle, so treat them as a
+    // bonus rather than the only route -- clicking the toast body still works).
+    const actions = s.status === 'WAITING_FOR_PERMISSION' || s.status === 'WAITING_FOR_INPUT'
+      ? [{ type: 'button' as const, text: 'Open VS Code' }]
+      : [];
     const n = new Notification({
       title,
       body,
+      actions,
       icon: this.iconPath,
       // Permission and failure must not evaporate while you are in another app.
       timeoutType: s.status === 'WAITING_FOR_PERMISSION' || s.status === 'ERROR'
@@ -133,6 +142,9 @@ export class Notifier {
       silent: s.status === 'COMPLETED',
     });
     n.on('click', () => this.onActivate(s.sessionId));
+    // Straight to the editor, skipping the overlay entirely — the point of the
+    // button is to remove a step at the moment you are least patient.
+    n.on('action', () => this.onOpenEditor(s.sessionId));
     n.show();
   }
 

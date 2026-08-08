@@ -546,6 +546,68 @@ test('humanGap reads as a duration', () => {
   assert.equal(humanGap(64 * 60_000), '1h 4m');
 });
 
+// The one metric only this tool can compute: how long Claude actually waited on
+// you. It has to be trustworthy, so it under-counts rather than over-counts.
+test('blocked time is banked when a real prompt resolves', () => {
+  // permission.jsonl: PermissionRequest at t0+1000, PostToolUse at t0+2000.
+  const s = only(run('permission.jsonl'));
+  assert.equal(s.blockedMs, 1000);
+});
+
+test('an auto-approved prompt contributes nothing', () => {
+  // Resolved inside the grace window -- it never waited on a human.
+  let st = reduceAll(initialState, fx('permission.jsonl').slice(0, 3));
+  const at = only(st).pendingPermission.at;
+  st = reduce(st, {
+    protocolVersion: 1, matcher: '*', receivedAt: at + 300,
+    event: { session_id: 's-perm-1', hook_event_name: 'PostToolUse', tool_name: 'Bash' },
+  });
+  assert.equal(only(st).blockedMs, 0, '300ms < grace, so it does not count');
+});
+
+test('blocked time accumulates across prompts and survives a new turn', () => {
+  let st = reduceAll(initialState, fx('permission.jsonl'));   // banks 1000
+  assert.equal(only(st).blockedMs, 1000);
+  const t = 2_000_000_000_000;
+  st = reduce(st, { protocolVersion: 1, receivedAt: t,
+    event: { session_id: 's-perm-1', hook_event_name: 'UserPromptSubmit' } });
+  assert.equal(only(st).blockedMs, 1000, 'a new turn must not wipe the tally');
+  st = reduce(st, { protocolVersion: 1, matcher: '*', receivedAt: t + 100,
+    event: { session_id: 's-perm-1', hook_event_name: 'PermissionRequest',
+             tool_name: 'Bash', tool_input: { command: 'rm -rf dist' } } });
+  st = reduce(st, { protocolVersion: 1, matcher: '*', receivedAt: t + 5_100,
+    event: { session_id: 's-perm-1', hook_event_name: 'PostToolUse', tool_name: 'Bash' } });
+  assert.equal(only(st).blockedMs, 6000, '1000 + 5000');
+});
+
+test('every path out of a prompt banks the same amount', () => {
+  // The total must not depend on HOW the prompt ended, or the metric is noise.
+  const enders = [
+    { hook_event_name: 'PostToolUse', tool_name: 'Bash' },
+    { hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', error: 'boom' },
+    { hook_event_name: 'PermissionDenied', tool_name: 'Bash' },
+    { hook_event_name: 'Stop' },
+    { hook_event_name: 'SessionEnd' },
+    { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: 'D:\\demo\\a.ts' } },
+    { hook_event_name: 'SubagentStart', agent_type: 'Explore' },
+    { hook_event_name: 'PreCompact' },
+  ];
+  for (const event of enders) {
+    const blocked = reduceAll(initialState, fx('permission.jsonl').slice(0, 3));
+    const at = only(blocked).pendingPermission.at;
+    const after = reduce(blocked, {
+      protocolVersion: 1, matcher: '*', receivedAt: at + 4000,
+      event: { session_id: 's-perm-1', ...event },
+    });
+    assert.equal(only(after).blockedMs, 4000, `${event.hook_event_name} banked the wrong amount`);
+  }
+});
+
+test('an unresolved prompt banks nothing — under-counting is the safe direction', () => {
+  const blocked = reduceAll(initialState, fx('permission.jsonl').slice(0, 3));
+  assert.equal(only(blocked).blockedMs, 0, 'still waiting, nothing banked yet');
+});
+
 test('severity is derived from status in exactly one place', () => {
   assert.equal(severityOf('WAITING_FOR_PERMISSION'), 'attention');
   assert.equal(severityOf('ERROR'), 'error');

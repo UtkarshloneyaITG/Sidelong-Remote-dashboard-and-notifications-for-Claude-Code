@@ -9,7 +9,7 @@
  * window geometry, focus, or hook installation -- none of them touch agent state.
  */
 
-import { appendFileSync, statSync } from 'node:fs';
+import { appendFileSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage,
@@ -69,6 +69,69 @@ let hookMessage: string | undefined;
  * preference, not an agent state change, and it is emphatically not approval.
  */
 const acknowledged: Record<string, string> = {};
+
+/**
+ * How long sessions spent blocked on you, per local day.
+ *
+ * The reducer accumulates `blockedMs` per session, but sessions are pruned and
+ * the app restarts, so the daily figure is banked here by watching each
+ * session's counter go up and adding the delta. Kept to 30 days.
+ *
+ * Local dates on purpose: "today" means your day, not UTC's.
+ */
+const STATS_KEEP_DAYS = 30;
+let blockedByDay: Record<string, number> = {};
+const lastBlockedSeen = new Map<string, number>();
+let statsDirty = false;
+
+const statsFile = (): string => join(app.getPath('userData'), 'stats.json');
+const dayKey = (d = new Date()): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function loadStats(): void {
+  try {
+    const raw: unknown = JSON.parse(readFileSync(statsFile(), 'utf8'));
+    if (raw && typeof raw === 'object') {
+      blockedByDay = Object.fromEntries(
+        Object.entries(raw as Record<string, unknown>)
+          .filter(([, v]) => typeof v === 'number' && Number.isFinite(v)) as [string, number][],
+      );
+    }
+  } catch {
+    /* first run, or a corrupt file we would rather ignore than crash on */
+  }
+}
+
+/**
+ * Flush if anything changed. Called on the view tick as well as on quit, because
+ * `will-quit` does not fire on a force-kill or a crash -- and this app is
+ * explicitly designed to be killable, so quit-only persistence would silently
+ * lose the day's figure exactly when someone exercises that property.
+ */
+function saveStats(): void {
+  if (!statsDirty) return;
+  statsDirty = false;
+  const keep = Object.keys(blockedByDay).sort().slice(-STATS_KEEP_DAYS);
+  blockedByDay = Object.fromEntries(keep.map((k) => [k, blockedByDay[k]]));
+  try {
+    writeFileSync(statsFile(), JSON.stringify(blockedByDay), 'utf8');
+  } catch {
+    /* a stat we cannot persist is not worth failing a launch over */
+  }
+}
+
+/** Fold each session's rising blockedMs into today's total. */
+function accrueBlocked(state: { sessions: Record<string, { sessionId: string; blockedMs: number }> }): void {
+  const today = dayKey();
+  for (const s of Object.values(state.sessions)) {
+    const seen = lastBlockedSeen.get(s.sessionId) ?? 0;
+    if (s.blockedMs > seen) {
+      blockedByDay[today] = (blockedByDay[today] ?? 0) + (s.blockedMs - seen);
+      statsDirty = true;
+    }
+    lastBlockedSeen.set(s.sessionId, s.blockedMs);
+  }
+}
 
 const registry = new AdapterRegistry();
 const claude = new ClaudeCodeAdapter();
@@ -157,6 +220,7 @@ function currentView(): OverlayView {
     bridge: bridge?.getInfo() ?? ({ status: 'disconnected' } as BridgeInfo),
     ingestReady: Boolean(ingest?.raw()),
     hookConfigDrift: hookMessage,
+    blockedTodayMs: blockedByDay[dayKey()] ?? 0,
     acknowledged,
   });
 }
@@ -198,6 +262,7 @@ async function startServers(): Promise<void> {
     onEvent: (env) => {
       debugLog(env);
       claude.ingest(env);
+      accrueBlocked(claude.getState());
       const gone = prunable(claude.getState(), Date.now(), SESSION_TTL_MS);
       for (const id of gone) {
         delete acknowledged[id];
@@ -428,38 +493,7 @@ function registerIpc(): void {
    *   2. the last file this session actually touched
    *   3. nothing at all -- a dead button beats a destroyed session
    */
-  ipcMain.handle('ui:open-editor', (_e, sessionId: unknown) => {
-    const view = currentView();
-    const session = typeof sessionId === 'string'
-      ? view.sessions.find((s) => s.sessionId === sessionId) ?? view.active
-      : view.active;
-
-    // Clicking [Open VS Code] means you are going to handle it there, so the bar
-    // stops shouting immediately rather than waiting for the tool to finish.
-    // Same semantics as [ok]: acknowledgement, not approval.
-    if (session?.permissionKey) {
-      acknowledged[session.sessionId] = session.permissionKey;
-      setImmediate(pushView);
-    }
-
-    // Ask the extension to focus too; it carries no path, so it cannot open anything.
-    const viaBridge = bridge?.focusEditor() ?? false;
-
-    const candidate = session?.bridge?.activeFile ?? bridge?.getInfo().activeFile ?? session?.lastFileAbs;
-    if (!candidate || !/^([a-zA-Z]:[\\/]|\/)[^\0]*$/.test(candidate)) {
-      return { via: viaBridge ? 'bridge' : 'none' };
-    }
-    // Belt and braces: whatever the path claims to be, only open it if it is a
-    // FILE on disk right now. This is the guard that makes the folder bug
-    // impossible regardless of where the path came from.
-    try {
-      if (!statSync(candidate).isFile()) return { via: viaBridge ? 'bridge' : 'none' };
-    } catch {
-      return { via: viaBridge ? 'bridge' : 'none' };
-    }
-    void shell.openExternal(`vscode://file/${encodeURI(candidate.replace(/\\/g, '/'))}`);
-    return { via: 'file' };
-  });
+  ipcMain.handle('ui:open-editor', (_e, sessionId: unknown) => openEditorFor(sessionId));
 
   ipcMain.handle('hooks:status', () => {
     const cfg = loadConfig();
@@ -479,6 +513,54 @@ function registerIpc(): void {
     pushView();
     return result;
   });
+}
+
+/**
+ * Focus VS Code for a session. Shared by the overlay button and the toast's
+ * action button, so both behave identically.
+ *
+ * NEVER opens a folder. `vscode://file/<dir>` launches a NEW window, which can
+ * evict the workspace hosting the session and cancel it -- and the session's
+ * `cwd` is very often a SUBFOLDER, which VS Code will not match to an already
+ * open workspace. Opening a real FILE instead reuses and raises the window that
+ * already has it.
+ *
+ * Preference order:
+ *   1. the bridge's active file (absolute, and definitely in the right window)
+ *   2. the last file this session actually touched
+ *   3. nothing at all -- a dead button beats a destroyed session
+ */
+function openEditorFor(sessionId: unknown): { via: string } {
+  const view = currentView();
+  const session = typeof sessionId === 'string'
+    ? view.sessions.find((s) => s.sessionId === sessionId) ?? view.active
+    : view.active;
+
+  // Clicking [Open VS Code] means you are going to handle it there, so the bar
+  // stops shouting immediately rather than waiting for the tool to finish.
+  // Same semantics as [ok]: acknowledgement, not approval.
+  if (session?.permissionKey) {
+    acknowledged[session.sessionId] = session.permissionKey;
+    setImmediate(pushView);
+  }
+
+  // Ask the extension to focus too; it carries no path, so it cannot open anything.
+  const viaBridge = bridge?.focusEditor() ?? false;
+
+  const candidate = session?.bridge?.activeFile ?? bridge?.getInfo().activeFile ?? session?.lastFileAbs;
+  if (!candidate || !/^([a-zA-Z]:[\\/]|\/)[^\0]*$/.test(candidate)) {
+    return { via: viaBridge ? 'bridge' : 'none' };
+  }
+  // Belt and braces: whatever the path claims to be, only open it if it is a
+  // FILE on disk right now. This is the guard that makes the folder bug
+  // impossible regardless of where the path came from.
+  try {
+    if (!statSync(candidate).isFile()) return { via: viaBridge ? 'bridge' : 'none' };
+  } catch {
+    return { via: viaBridge ? 'bridge' : 'none' };
+  }
+  void shell.openExternal(`vscode://file/${encodeURI(candidate.replace(/\\/g, '/'))}`);
+  return { via: 'file' };
 }
 
 // ------------------------------------------------------------------- shortcut
@@ -522,16 +604,20 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(async () => {
     if (process.platform === 'win32') app.setAppUserModelId('com.agentwatcher.overlay');
+    loadStats();
     registerIpc();
     win = createWindow();
     await startServers();
     notifier = new Notifier(() => {
       win?.showInactive();
       setExpanded(true);
-    }, ICON_PATH);
+    }, (sessionId) => { openEditorFor(sessionId); }, ICON_PATH);
     registerShortcut();
     createTray();
-    setInterval(pushView, VIEW_TICK_MS);
+    setInterval(() => {
+      pushView();
+      saveStats();
+    }, VIEW_TICK_MS);
     pushView();
   });
 
@@ -541,6 +627,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('will-quit', async () => {
+    saveStats();
     globalShortcut.unregisterAll();
     tray?.destroy();
     tray = undefined;

@@ -533,6 +533,19 @@ export default function App(): JSX.Element {
             </button>
           </div>
 
+        {/* The one number nothing else can compute: how long Claude actually
+            waited on you today. Only shown once there is something to report. */}
+        {(view.blockedTodayMs ?? 0) >= 1000 && (
+          <div className="mt-3 flex items-baseline gap-2 px-2.5">
+            <span className="text-[10px] uppercase tracking-wider text-zinc-600">
+              Waiting on you today
+            </span>
+            <span className="font-mono text-[11px] tabular-nums text-amber-400/90">
+              {clock(view.blockedTodayMs ?? 0)}
+            </span>
+          </div>
+        )}
+
         <ConnectionRow view={view} />
         {setupOpen && <Setup onClose={() => setSetupOpen(false)} />}
       </div>

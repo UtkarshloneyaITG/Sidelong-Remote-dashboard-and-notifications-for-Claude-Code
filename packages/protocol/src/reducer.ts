@@ -15,6 +15,7 @@ import type { HookEvent, IngestEnvelope } from './events.js';
 import {
   MAX_DETAIL, MAX_MESSAGE, absoluteFile, changedFile, describePermission, describeTool, truncate,
 } from './describe.js';
+import { PERMISSION_GRACE_MS } from './state.js';
 import type { Activity, SessionState, Status, WatcherState } from './state.js';
 
 const MAX_ACTIVITY = 50;
@@ -44,6 +45,7 @@ function blankSession(sessionId: string, now: number): SessionState {
     elapsedMs: 0,
     activity: [],
     filesChanged: [],
+    blockedMs: 0,
     subagents: 0,
     compacting: false,
   };
@@ -95,15 +97,35 @@ const addFile = (files: string[], f: string | undefined): string[] =>
   !f || files.includes(f) ? files : [...files, f].slice(-MAX_FILES);
 
 /**
+ * Bank the time an outstanding prompt spent waiting on a human.
+ *
+ * Called from EVERY path that clears `pendingPermission`, so the total cannot
+ * drift depending on how a prompt happened to end. Prompts resolved inside the
+ * grace window are ignored: they were auto-approved and never actually blocked
+ * you, and counting them would inflate the one metric that is supposed to be
+ * trustworthy.
+ *
+ * A prompt that never resolves at all (you interrupted the turn — no hook fires)
+ * contributes nothing. Under-counting is the right direction to be wrong in.
+ */
+function settleBlocked(s: SessionState, now: number): number {
+  const p = s.pendingPermission;
+  if (!p) return s.blockedMs;
+  const held = now - p.at;
+  return held >= PERMISSION_GRACE_MS ? s.blockedMs + held : s.blockedMs;
+}
+
+/**
  * Clear a pending prompt because the session has demonstrably moved on.
  *
  * Returns an empty patch when nothing was pending, so callers can spread it
  * unconditionally without disturbing a session that was never blocked.
  */
-function unblocked(s: SessionState): Partial<SessionState> {
+function unblocked(s: SessionState, now: number): Partial<SessionState> {
   if (!s.pendingPermission) return {};
   return {
     pendingPermission: undefined,
+    blockedMs: settleBlocked(s, now),
     status: s.status === 'WAITING_FOR_PERMISSION' ? 'WORKING' : s.status,
     message: s.status === 'WAITING_FOR_PERMISSION' ? 'Claude is working…' : s.message,
   };
@@ -118,6 +140,8 @@ function beginTurn(s: SessionState, now: number, message: string): SessionState 
     details: undefined,
     error: undefined,
     pendingPermission: undefined,
+    // Accumulates across turns; a new prompt does not wipe what you already lost.
+    blockedMs: settleBlocked(s, now),
     turnStartedAt: now,
     elapsedMs: 0,
     activity: [],
@@ -148,6 +172,8 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
         elapsedMs: 0,
         activity: [],
         filesChanged: [],
+        // A fresh session starts its own tally.
+        blockedMs: 0,
         subagents: 0,
         compacting: false,
       };
@@ -174,6 +200,7 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
         turnStartedAt: base.turnStartedAt ?? now,
         message: isSubagent ? base.message : label,
         pendingPermission: undefined,
+        blockedMs: settleBlocked(base, now),
         activity,
         lastFileAbs: absoluteFile(e.tool_input) ?? base.lastFileAbs,
       };
@@ -185,6 +212,7 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
         ...base,
         status: base.status === 'WAITING_FOR_PERMISSION' ? 'WORKING' : base.status,
         pendingPermission: undefined,
+        blockedMs: settleBlocked(base, now),
         activity,
         filesChanged: addFile(base.filesChanged, changedFile(e.tool_name, e.tool_input, cwd)),
         lastFileAbs: absoluteFile(e.tool_input) ?? base.lastFileAbs,
@@ -199,8 +227,13 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
       // failing) left the session stuck on WAITING_FOR_PERMISSION forever, with
       // no event that would ever clear it -- observed live.
       const resolved = base.status === 'WAITING_FOR_PERMISSION'
-        ? { status: 'WORKING' as const, message: 'Claude is working…', pendingPermission: undefined }
-        : { pendingPermission: base.pendingPermission };
+        ? {
+            status: 'WORKING' as const,
+            message: 'Claude is working…',
+            pendingPermission: undefined,
+            blockedMs: settleBlocked(base, now),
+          }
+        : { pendingPermission: base.pendingPermission, blockedMs: base.blockedMs };
 
       if (e.is_interrupt) {
         return {
@@ -231,6 +264,8 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
         status: 'WAITING_FOR_PERMISSION',
         message: 'Claude needs your attention',
         details: undefined,
+        // A second prompt replacing a first must bank the first one's wait.
+        blockedMs: settleBlocked(base, now),
         pendingPermission: {
           tool: e.tool_name ?? 'unknown',
           detail: describePermission(e.tool_name, e.tool_input, cwd),
@@ -246,6 +281,7 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
         message: base.status === 'WAITING_FOR_PERMISSION' ? 'Claude is working…' : base.message,
         details: `Denied: ${e.tool_name ?? 'tool'}`,
         pendingPermission: undefined,
+        blockedMs: settleBlocked(base, now),
       };
 
     case 'Notification':
@@ -291,6 +327,7 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
           ? `${base.filesChanged.length} file${base.filesChanged.length === 1 ? '' : 's'} changed`
           : undefined,
         pendingPermission: undefined,
+        blockedMs: settleBlocked(base, now),
         // Close anything still spinning; the turn is over by definition.
         activity: base.activity.map((a) =>
           a.status === 'running' ? { ...a, status: 'done' as const, endedAt: now } : a),
@@ -306,6 +343,7 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
         details: truncate(e.error ?? e.message, MAX_DETAIL) || undefined,
         error: { kind, detail: truncate(e.error ?? e.message, MAX_DETAIL) },
         pendingPermission: undefined,
+        blockedMs: settleBlocked(base, now),
       };
     }
 
@@ -315,6 +353,7 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
         status: 'DISCONNECTED',
         message: `Session ended${m && m !== 'other' ? ` (${m})` : ''}`,
         pendingPermission: undefined,
+        blockedMs: settleBlocked(base, now),
         turnStartedAt: undefined,
       };
 
@@ -325,18 +364,18 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
     // branch: falsely clearing a real prompt hides the one state this app
     // exists for, so unknown future events are left alone.
     case 'SubagentStart':
-      return { ...base, ...unblocked(base), subagents: base.subagents + 1 };
+      return { ...base, ...unblocked(base, now), subagents: base.subagents + 1 };
 
     case 'SubagentStop':
-      return { ...base, ...unblocked(base), subagents: Math.max(0, base.subagents - 1) };
+      return { ...base, ...unblocked(base, now), subagents: Math.max(0, base.subagents - 1) };
 
     case 'PreCompact':
       // Not cosmetic: compaction is the most common cause of a long silence that
       // otherwise looks like a hang.
-      return { ...base, ...unblocked(base), compacting: true, details: 'Compacting context…' };
+      return { ...base, ...unblocked(base, now), compacting: true, details: 'Compacting context…' };
 
     case 'PostCompact':
-      return { ...base, ...unblocked(base), compacting: false, details: undefined };
+      return { ...base, ...unblocked(base, now), compacting: false, details: undefined };
 
     default:
       // An event we do not model still proves the session is alive.
