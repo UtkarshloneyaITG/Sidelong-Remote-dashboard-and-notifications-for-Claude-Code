@@ -530,6 +530,11 @@ Your original settings file is also backed up at `settings.json.agent-watcher-ba
 before the first change. Inside Claude Code, `/hooks` shows what remains and
 `disableAllHooks` turns everything off at once.
 
+## Changelog
+
+Every release is listed in **[CHANGELOG.md](CHANGELOG.md)**, including one version
+that was withdrawn and why.
+
 ## License
 
 **[MIT](LICENSE) — free for everyone, forever.**
