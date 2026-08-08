@@ -60,11 +60,13 @@ function writeSettings(file: string, settings: SettingsFile): void {
 
 export function install(
   scope: HookScope, port: number, token: string, projectDir?: string,
+  /** Set when permission decisions are on — raises the PermissionRequest timeout. */
+  decisionWindowMs?: number,
 ): HookStatus {
   const file = settingsPath(scope, projectDir);
   const settings = readSettings(file);
-  writeSettings(file, mergeHooks(settings, port, token));
-  return status(scope, port, token, projectDir);
+  writeSettings(file, mergeHooks(settings, port, token, decisionWindowMs));
+  return status(scope, port, token, projectDir, decisionWindowMs);
 }
 
 export function uninstall(scope: HookScope, port: number, projectDir?: string): HookStatus {
@@ -75,10 +77,11 @@ export function uninstall(scope: HookScope, port: number, projectDir?: string): 
 
 export function status(
   scope: HookScope, port: number, token: string, projectDir?: string,
+  decisionWindowMs?: number,
 ): HookStatus {
   const file = settingsPath(scope, projectDir);
   const settings = readSettings(file);
-  const drift = findDrift(settings, port, token);
+  const drift = findDrift(settings, port, token, decisionWindowMs);
   const allow = allowlistProblem(settings, port);
   return {
     scope,
@@ -94,10 +97,10 @@ export function status(
  * and a stale install in the other scope is still worth reporting.
  */
 export function overallStatus(
-  port: number, token: string, projectDir?: string,
+  port: number, token: string, decisionWindowMs?: number, projectDir?: string,
 ): { user: HookStatus; project: HookStatus; message?: string } {
-  const user = status('user', port, token, projectDir);
-  const project = status('project', port, token, projectDir);
+  const user = status('user', port, token, projectDir, decisionWindowMs);
+  const project = status('project', port, token, projectDir, decisionWindowMs);
   const allowlistNeeded = user.allowlistNeeded ?? project.allowlistNeeded;
 
   let message: string | undefined;

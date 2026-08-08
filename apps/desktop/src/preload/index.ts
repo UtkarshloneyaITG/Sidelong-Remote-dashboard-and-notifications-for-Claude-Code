@@ -29,6 +29,14 @@ const api = {
   /** "Seen it" -- shrinks the bar. Sends nothing to Claude Code. */
   acknowledge: (sessionId: string, key: string): Promise<void> =>
     ipcRenderer.invoke('ui:acknowledge', sessionId, key),
+  /**
+   * Answer a held permission prompt. The ONLY channel here that can cause
+   * something to run -- and only when permissionDecisions is enabled in config,
+   * and only for a request Claude Code is already waiting on. It names no
+   * command and carries no path: just a session and one of three fixed verbs.
+   */
+  decide: (sessionId: string, behavior: 'allow' | 'deny' | 'defer'): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('ui:decide', sessionId, behavior),
   quit: (): Promise<void> => ipcRenderer.invoke('ui:quit'),
   hooks: {
     status: (): Promise<unknown> => ipcRenderer.invoke('hooks:status'),

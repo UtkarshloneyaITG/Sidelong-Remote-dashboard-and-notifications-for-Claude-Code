@@ -64,6 +64,15 @@ export interface SessionView {
    */
   permissionActionable: boolean;
   /**
+   * Set only while the app is holding this session's PermissionRequest open and
+   * can still answer it. `expiresAt` is when the hold lapses into "no decision"
+   * and Claude Code prompts you normally.
+   *
+   * Present ONLY when permission decisions are switched on. Its absence is what
+   * keeps Allow/Deny off the screen by default.
+   */
+  decision?: { expiresAt: number };
+  /**
    * Claude is running tools under an auto-approving permission mode. Shown as
    * context; it is deliberately NOT what gates the buttons (see
    * PERMISSION_GRACE_MS).
@@ -172,6 +181,7 @@ export function toSessionView(
   staleMs: number,
   bridge: BridgeInfo,
   acknowledgedKey?: string,
+  decision?: { expiresAt: number },
 ): SessionView {
   const terminal = s.status === 'COMPLETED' || s.status === 'ERROR' || s.status === 'DISCONNECTED';
   const permissionKey = permissionKeyOf(s);
@@ -224,6 +234,9 @@ export function toSessionView(
       && now - s.pendingPermission.at >= PERMISSION_GRACE_MS,
     ),
     autoRunning: s.status === 'WORKING' && AUTO_MODES.has(s.permissionMode ?? ''),
+    // Only while the hold is genuinely still open — a lapsed one must not leave
+    // clickable buttons that would write to a finished response.
+    decision: decision && decision.expiresAt > now ? decision : undefined,
     error: s.error,
     blockedMs: s.blockedMs,
     subagents: s.subagents,
@@ -246,10 +259,15 @@ export function buildView(
     acknowledged?: Record<string, string>;
     /** Today's blocked-on-you total, banked by the main process. */
     blockedTodayMs?: number;
+    /** sessionId -> an open PermissionRequest hold. Only when decisions are on. */
+    decisions?: Record<string, { expiresAt: number }>;
   },
 ): OverlayView {
   const sessions = Object.values(state.sessions)
-    .map((s) => toSessionView(s, opts.now, opts.staleMs, opts.bridge, opts.acknowledged?.[s.sessionId]))
+    .map((s) => toSessionView(
+      s, opts.now, opts.staleMs, opts.bridge,
+      opts.acknowledged?.[s.sessionId], opts.decisions?.[s.sessionId],
+    ))
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 
   // A session genuinely blocked on permission outranks recency -- it is the whole

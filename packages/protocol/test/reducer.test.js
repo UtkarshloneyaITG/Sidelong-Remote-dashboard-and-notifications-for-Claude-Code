@@ -7,7 +7,7 @@ import { loadFixture } from '../../../tools/replay.mjs';
 import {
   absoluteFile,
   buildHookConfig, buildView, describePermission, describeTool, findDrift, allowlistProblem,
-  PERMISSION_GRACE_MS, humanGap,
+  PERMISSION_GRACE_MS, humanGap, decisionTimeoutSeconds,
   initialState, isStale, mergeHooks, reduce, reduceAll, removeHooks, severityOf, shortPath,
   truncate, parseBridgeMessage, bridgeMatches,
 } from '../dist/index.js';
@@ -678,6 +678,44 @@ test('Notification and StopFailure get one hook per matcher, matcher in the URL'
   assert.equal(cfg.StopFailure.length, 10);
   const perm = cfg.Notification.find((g) => g.matcher === 'permission_prompt');
   assert.match(perm.hooks[0].url, /\/Notification\/permission_prompt$/);
+});
+
+// Permission decisions hold ONE hook's response open. That must not become a
+// licence to loosen any other timeout.
+test('decisions raise the PermissionRequest timeout and nothing else', () => {
+  const off = buildHookConfig(47821, 'tok');
+  const on = buildHookConfig(47821, 'tok', 15_000);
+
+  assert.equal(off.PermissionRequest[0].hooks[0].timeout, 5, 'tight by default');
+  assert.equal(on.PermissionRequest[0].hooks[0].timeout, 20, '15s window + 5s headroom');
+
+  // Every other event must be byte-identical between the two configs.
+  for (const event of Object.keys(off)) {
+    if (event === 'PermissionRequest') continue;
+    assert.deepEqual(on[event], off[event], `${event} must be untouched`);
+  }
+  assert.equal(on.SessionEnd[0].hooks[0].timeout, 1, 'SessionEnd stays minimal');
+});
+
+test('the app always gets to answer before Claude Code times out', () => {
+  // Headroom exists so the app sends the empty "no decision" itself rather than
+  // letting the hook time out. Both end at the normal prompt; ours is tidier.
+  for (const windowMs of [5_000, 15_000, 60_000]) {
+    assert.ok(decisionTimeoutSeconds(windowMs) * 1000 > windowMs,
+      `${windowMs}ms window needs a longer hook timeout`);
+  }
+});
+
+test('toggling decisions is reported as drift, so hooks get reinstalled', () => {
+  const installedWithout = mergeHooks({}, 47821, 'tok');
+  // Turning the feature ON without reinstalling would leave a 5s timeout that
+  // cuts every decision short — the app must notice and say so.
+  assert.match(findDrift(installedWithout, 47821, 'tok', 15_000), /reinstall/i);
+  assert.equal(findDrift(installedWithout, 47821, 'tok'), undefined);
+
+  const installedWith = mergeHooks({}, 47821, 'tok', 15_000);
+  assert.equal(findDrift(installedWith, 47821, 'tok', 15_000), undefined);
+  assert.match(findDrift(installedWith, 47821, 'tok'), /reinstall/i);
 });
 
 test('install merges into existing hooks and never clobbers them', () => {

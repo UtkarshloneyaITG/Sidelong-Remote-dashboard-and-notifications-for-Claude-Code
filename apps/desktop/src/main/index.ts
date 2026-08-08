@@ -22,7 +22,7 @@ import {
 import { AdapterRegistry, ClaudeCodeAdapter } from '@agent-watcher/agent-adapters';
 
 import { DEFAULT_PORT, loadConfig, updateConfig } from './config.js';
-import { IngestServer, PortInUseError } from './ingest.js';
+import { IngestServer, PortInUseError, type Decision } from './ingest.js';
 import { BridgeServer } from './bridge-server.js';
 import { Notifier } from './notifier.js';
 import * as hooks from './hooks-installer.js';
@@ -69,6 +69,26 @@ let hookMessage: string | undefined;
  * preference, not an agent state change, and it is emphatically not approval.
  */
 const acknowledged: Record<string, string> = {};
+
+/**
+ * Open PermissionRequest holds, by session.
+ *
+ * A held request means a tool call is BLOCKED, so nothing may sit in here longer
+ * than the configured window -- the ingest server owns that timer and always
+ * settles. This map only lets the UI find the right `settle` to call.
+ */
+interface Hold { settle: (d: Decision) => void; expiresAt: number }
+const holds = new Map<string, Hold>();
+
+/** Resolve a held prompt. Idempotent: settle() itself ignores a second call. */
+function decide(sessionId: string, behavior: 'allow' | 'deny' | 'defer'): boolean {
+  const hold = holds.get(sessionId);
+  if (!hold) return false;
+  holds.delete(sessionId);
+  hold.settle(behavior === 'defer' ? null : { behavior });
+  pushView();
+  return true;
+}
 
 /**
  * How long sessions spent blocked on you, per local day.
@@ -221,6 +241,9 @@ function currentView(): OverlayView {
     ingestReady: Boolean(ingest?.raw()),
     hookConfigDrift: hookMessage,
     blockedTodayMs: blockedByDay[dayKey()] ?? 0,
+    decisions: Object.fromEntries(
+      [...holds].map(([id, h]) => [id, { expiresAt: h.expiresAt }]),
+    ),
     acknowledged,
   });
 }
@@ -259,6 +282,24 @@ async function startServers(): Promise<void> {
   ingest = new IngestServer({
     port: cfg.port,
     token: cfg.token,
+    // Zero disables holding entirely, which is the default.
+    decisionWindowMs: cfg.permissionDecisions ? cfg.decisionWindowMs : 0,
+    onDecisionRequest: cfg.permissionDecisions
+      ? (env, settle, deadline) => {
+          const id = env.event.session_id;
+          // Already looking at VS Code? Its own prompt is right there and is
+          // better than ours, so hand the decision straight back instead of
+          // delaying it. This is what stops the feature making things WORSE
+          // when you are not using the overlay.
+          if (bridge?.getInfo().focused) {
+            settle(null);
+            return;
+          }
+          holds.get(id)?.settle(null);   // a newer prompt supersedes an older hold
+          holds.set(id, { settle, expiresAt: deadline });
+          setImmediate(pushView);
+        }
+      : undefined,
     onEvent: (env) => {
       debugLog(env);
       claude.ingest(env);
@@ -453,9 +494,15 @@ function refreshTray(view: OverlayView): void {
   ]));
 }
 
+/** The window the installed hooks must accommodate, or undefined when off. */
+function decisionWindow(): number | undefined {
+  const cfg = loadConfig();
+  return cfg.permissionDecisions ? cfg.decisionWindowMs : undefined;
+}
+
 function refreshHookStatus(): void {
   const cfg = loadConfig();
-  hookMessage = hooks.overallStatus(cfg.port, cfg.token).message;
+  hookMessage = hooks.overallStatus(cfg.port, cfg.token, decisionWindow()).message;
 }
 
 // --------------------------------------------------------------------- IPC
@@ -495,13 +542,31 @@ function registerIpc(): void {
    */
   ipcMain.handle('ui:open-editor', (_e, sessionId: unknown) => openEditorFor(sessionId));
 
+  /**
+   * Allow / Deny a held permission prompt.
+   *
+   * This is the ONE channel in the app that can cause something to run, so it is
+   * deliberately narrow: it names no command and carries no path, only which
+   * session and which of three fixed verbs. It can only ever answer a request
+   * Claude Code is already waiting on, and it does nothing at all unless
+   * permissionDecisions is switched on in the config.
+   */
+  ipcMain.handle('ui:decide', (_e, sessionId: unknown, behavior: unknown) => {
+    if (!loadConfig().permissionDecisions) return { ok: false, reason: 'disabled' };
+    if (typeof sessionId !== 'string') return { ok: false, reason: 'bad session' };
+    if (behavior !== 'allow' && behavior !== 'deny' && behavior !== 'defer') {
+      return { ok: false, reason: 'bad behavior' };
+    }
+    return { ok: decide(sessionId, behavior) };
+  });
+
   ipcMain.handle('hooks:status', () => {
     const cfg = loadConfig();
-    return { ...hooks.overallStatus(cfg.port, cfg.token), port: cfg.port, url: hookBaseUrl(cfg.port) };
+    return { ...hooks.overallStatus(cfg.port, cfg.token, decisionWindow()), port: cfg.port, url: hookBaseUrl(cfg.port) };
   });
   ipcMain.handle('hooks:install', (_e, scope: unknown) => {
     const cfg = loadConfig();
-    const result = hooks.install(scope === 'project' ? 'project' : 'user', cfg.port, cfg.token);
+    const result = hooks.install(scope === 'project' ? 'project' : 'user', cfg.port, cfg.token, undefined, decisionWindow());
     refreshHookStatus();
     pushView();
     return result;
@@ -628,6 +693,9 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('will-quit', async () => {
     saveStats();
+    // Hand every held prompt back rather than dying with it open. Claude Code
+    // would time out and prompt normally anyway; this just makes it immediate.
+    for (const [id] of holds) decide(id, 'defer');
     globalShortcut.unregisterAll();
     tray?.destroy();
     tray = undefined;

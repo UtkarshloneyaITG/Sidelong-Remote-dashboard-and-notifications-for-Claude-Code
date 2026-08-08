@@ -63,7 +63,24 @@ const entry = (url: string, token: string, timeout: number): HttpHook => ({
  * information we need and no payload field is documented to carry it. One entry
  * per matcher, and the ingest handler reads it off the path.
  */
-export function buildHookConfig(port: number, token: string): Record<string, HookGroup[]> {
+/**
+ * The timeout PermissionRequest needs when the app is allowed to answer prompts.
+ *
+ * While a decision is outstanding the tool call is BLOCKED, so this is the
+ * longest the app can ever stall one. A few seconds of headroom over the app's
+ * own window means the app always answers first -- an app-sent empty response is
+ * tidier than letting Claude Code hit its own timeout, and both land in the same
+ * place (the normal permission prompt).
+ */
+export const decisionTimeoutSeconds = (windowMs: number): number =>
+  Math.ceil(windowMs / 1000) + 5;
+
+export function buildHookConfig(
+  port: number,
+  token: string,
+  /** Set only when permission decisions are enabled. Raises ONE hook's timeout. */
+  decisionWindowMs?: number,
+): Record<string, HookGroup[]> {
   const base = hookBaseUrl(port);
   const out: Record<string, HookGroup[]> = {};
 
@@ -75,7 +92,13 @@ export function buildHookConfig(port: number, token: string): Record<string, Hoo
     }));
   }
   for (const event of [...TOOL_MATCHED_EVENTS, ...SUBAGENT_EVENTS, ...COMPACT_EVENTS]) {
-    out[event] = [{ matcher: '*', hooks: [entry(`${base}/${event}`, token, DEFAULT_TIMEOUT)] }];
+    // PermissionRequest is the ONLY event that may hold its response open, and
+    // only when decisions are switched on. Everything else keeps the tight
+    // 204-and-forget timeout.
+    const timeout = event === 'PermissionRequest' && decisionWindowMs
+      ? decisionTimeoutSeconds(decisionWindowMs)
+      : DEFAULT_TIMEOUT;
+    out[event] = [{ matcher: '*', hooks: [entry(`${base}/${event}`, token, timeout)] }];
   }
   for (const event of UNMATCHED_EVENTS) {
     out[event] = [{ hooks: [entry(`${base}/${event}`, token, DEFAULT_TIMEOUT)] }];
@@ -105,9 +128,14 @@ export function removeHooks(settings: SettingsFile, port: number): SettingsFile 
 }
 
 /** Idempotent install: strip ours, then append. Never clobbers foreign hooks. */
-export function mergeHooks(settings: SettingsFile, port: number, token: string): SettingsFile {
+export function mergeHooks(
+  settings: SettingsFile,
+  port: number,
+  token: string,
+  decisionWindowMs?: number,
+): SettingsFile {
   const cleaned = removeHooks(settings, port);
-  const ours = buildHookConfig(port, token);
+  const ours = buildHookConfig(port, token, decisionWindowMs);
   const hooks: Record<string, HookGroup[]> = { ...(cleaned.hooks ?? {}) };
   for (const [event, groups] of Object.entries(ours)) {
     hooks[event] = [...(hooks[event] ?? []), ...groups];
@@ -127,8 +155,9 @@ export function findDrift(
   settings: SettingsFile,
   port: number,
   token: string,
+  decisionWindowMs?: number,
 ): string | undefined {
-  const want = buildHookConfig(port, token);
+  const want = buildHookConfig(port, token, decisionWindowMs);
   const have = settings.hooks ?? {};
   const base = hookBaseUrl(port);
 
@@ -144,6 +173,14 @@ export function findDrift(
       }
       if ((match as HttpHook).headers?.[TOKEN_HEADER] !== token) {
         return 'The installed hooks carry a different token than this app is using.';
+      }
+      // The timeout matters for exactly one event: an installed PermissionRequest
+      // timeout shorter than the decision window would let Claude Code give up
+      // mid-decision, so every Allow/Deny click would arrive too late.
+      if ((match as HttpHook).timeout !== wanted.timeout) {
+        return event === 'PermissionRequest'
+          ? 'Permission decisions were switched on or off — reinstall the hooks so the PermissionRequest timeout matches.'
+          : `The installed ${event} hook has a different timeout than this app expects.`;
       }
     }
   }

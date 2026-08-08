@@ -32,6 +32,28 @@ export interface AppConfig {
   completedDismissMs: number;
   /** Opt-in, local-only debug log. Off by default: payloads are sensitive. */
   debugLog: boolean;
+  /**
+   * Let the overlay ANSWER permission prompts with Allow / Deny.
+   *
+   * OFF by default, deliberately. It changes what this app is: a watcher becomes
+   * something that can approve a command, so the UI gains a path to execution
+   * that did not exist before.
+   *
+   * It also has a cost even when you never click. While a decision is
+   * outstanding the tool call is blocked and **VS Code's own prompt does not
+   * appear** — so if you ignore the overlay, you have delayed the normal prompt
+   * by up to `decisionWindowMs`. Mitigated by answering instantly with "no
+   * decision" whenever the bridge says VS Code already has focus.
+   *
+   * Changing this requires reinstalling the hooks: it alters the installed
+   * PermissionRequest timeout, and the app will tell you if they drift.
+   */
+  permissionDecisions: boolean;
+  /**
+   * How long a prompt may be held waiting for your click. Keep it short — it is
+   * the longest this app can ever stall one tool call.
+   */
+  decisionWindowMs: number;
   expanded: boolean;
   bounds?: { x: number; y: number; width: number; height: number };
 }
@@ -44,6 +66,8 @@ const DEFAULTS: Omit<AppConfig, 'token'> = {
   staleMs: 90_000,
   completedDismissMs: 20_000,
   debugLog: false,
+  permissionDecisions: false,
+  decisionWindowMs: 15_000,
   expanded: false,
 };
 

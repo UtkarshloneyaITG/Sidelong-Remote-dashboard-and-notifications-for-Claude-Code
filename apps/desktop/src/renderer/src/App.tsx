@@ -21,6 +21,7 @@ declare global {
       setExpanded(expanded: boolean): Promise<void>;
       openEditor(sessionId?: string): Promise<{ via: string }>;
       acknowledge(sessionId: string, key: string): Promise<void>;
+      decide(sessionId: string, behavior: 'allow' | 'deny' | 'defer'): Promise<{ ok: boolean }>;
       quit(): Promise<void>;
       hooks: {
         status(): Promise<HookStatusPayload>;
@@ -336,6 +337,40 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
       >
         ▸
       </button>
+
+      {/*
+        Allow / Deny. Present ONLY while the app is actually holding this
+        session's PermissionRequest open -- `a.decision` is absent unless the
+        feature is switched on AND the hold has not lapsed, so by default this
+        never renders and the app stays a watcher.
+
+        The countdown is not decoration: it says how long until the hold lapses
+        and Claude Code prompts you normally instead. Nothing is lost when it
+        runs out.
+      */}
+      {a?.decision && (
+        <span className="absolute inset-y-0 right-7 z-10 flex items-center gap-1.5 bg-zinc-950 pl-8">
+          <span className="font-mono text-[10px] tabular-nums text-zinc-500">
+            {Math.max(0, Math.ceil((a.decision.expiresAt - Date.now()) / 1000))}s
+          </span>
+          <button
+            type="button"
+            title="Run it. This actually approves the tool call."
+            className="no-drag rounded-md bg-emerald-400 px-2.5 py-1 text-[11px] font-semibold text-emerald-950 transition hover:bg-emerald-300"
+            onClick={() => void window.watcher.decide(a.sessionId, 'allow')}
+          >
+            Allow
+          </button>
+          <button
+            type="button"
+            title="Refuse it. Claude is told the call was denied."
+            className="no-drag rounded-md border border-rose-500/50 px-2.5 py-1 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/10"
+            onClick={() => void window.watcher.decide(a.sessionId, 'deny')}
+          >
+            Deny
+          </button>
+        </span>
+      )}
 
       {/*
         Actions FLOAT over the right end of the bar rather than sitting in the
