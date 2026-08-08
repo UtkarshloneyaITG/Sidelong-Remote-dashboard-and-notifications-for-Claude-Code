@@ -178,6 +178,11 @@ section:first-of-type { border-top: 0; }
 }
 .hero__tag b { color: var(--amber); font-weight: 500; }
 .hero__cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.dl-meta {
+  font-family: var(--mono); font-size: 11px; color: var(--text-3);
+  margin: 12px 0 0; letter-spacing: 0.04em;
+}
+.btn svg { flex: 0 0 auto; }
 
 .btn {
   display: inline-flex; align-items: center; gap: 8px;

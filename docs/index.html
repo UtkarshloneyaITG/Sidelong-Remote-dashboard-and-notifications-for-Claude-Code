@@ -53,6 +53,7 @@
 
 <nav class="nav">
   <a class="nav__brand" href="./"><img src="assets/logo.svg" width="24" height="24" alt=""> Sidelong</a>
+  <a href="#download">Download</a>
   <a href="#states">States</a>
   <a href="#how">How it works</a>
   <a href="install.html">Install</a>
@@ -93,11 +94,69 @@
   </div>
 
   <div class="hero__cta">
-    <a class="btn btn--solid" href="install.html">Install in 4 steps →</a>
-    <a class="btn btn--ghost" href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code">View source</a>
+    <!-- Falls back to the releases page with JS off; the script below upgrades it
+         to a direct .exe link for whatever the newest release actually is. -->
+    <a class="btn btn--solid" id="dl-main"
+       href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+           stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 1.8v8.4M4.4 6.8 8 10.4l3.6-3.6M2.2 13.4h11.6"/>
+      </svg>
+      Download for Windows
+    </a>
+    <a class="btn btn--ghost" href="install.html">Install guide</a>
     <a class="btn btn--ghost" href="capabilities.html">What it can't do</a>
   </div>
+  <p class="dl-meta" id="dl-meta">Windows 10/11 · 64-bit · free and open source</p>
 </header>
+
+<section id="download">
+  <p class="eyebrow">Download</p>
+  <h2>Grab it and go.</h2>
+  <p>
+    Built by GitHub Actions from a tagged commit, after passing the test suite on Ubuntu,
+    Windows and macOS. No account, no API key, nothing to configure before it runs.
+  </p>
+
+  <div class="grid grid--3">
+    <div class="cell">
+      <span class="cell__n">Recommended</span>
+      <h3>Installer</h3>
+      <p>Start-menu and desktop shortcuts, per-user, no admin rights needed.</p>
+      <p style="margin-top:14px">
+        <a class="btn btn--solid" id="dl-setup"
+           href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest">Setup&nbsp;.exe</a>
+      </p>
+    </div>
+    <div class="cell">
+      <span class="cell__n">No install</span>
+      <h3>Portable</h3>
+      <p>One file. Run it from anywhere, leaves nothing behind but its config.</p>
+      <p style="margin-top:14px">
+        <a class="btn btn--ghost" id="dl-portable"
+           href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest">Portable&nbsp;.exe</a>
+      </p>
+    </div>
+    <div class="cell">
+      <span class="cell__n">Optional</span>
+      <h3>VS Code bridge</h3>
+      <p>Focus-aware notifications, git branch and diagnostics. Not required.</p>
+      <p style="margin-top:14px">
+        <a class="btn btn--ghost" id="dl-vsix"
+           href="https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest">.vsix</a>
+      </p>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:26px">
+    <p><strong>The binaries are unsigned.</strong> A code-signing certificate costs
+    hundreds a year, so Windows SmartScreen will say “Windows protected your PC” the first
+    time — choose <strong>More info → Run anyway</strong>. If you would rather not trust a
+    stranger's binary, the whole thing builds from source with
+    <code>npm install &amp;&amp; npm run build</code>, and every release is produced by a
+    public workflow you can read.</p>
+  </div>
+</section>
 
 <section id="why">
   <p class="eyebrow">01 — The problem</p>
@@ -263,5 +322,57 @@ node tools/install-hooks.mjs status        <span class="c"># confirm</span></cod
 </footer>
 
 </div>
+
+<script>
+/*
+  Point the download buttons at the newest release's actual assets.
+
+  The markup already links to /releases/latest, so this is a pure upgrade: with
+  JavaScript off, or if the API is unreachable or rate-limited, every button still
+  works -- it just lands on the releases page instead of starting the download.
+  That is why nothing here throws or blanks the UI on failure.
+
+  Asset filenames carry the version, so they cannot be hardcoded without going
+  stale on the next tag.
+*/
+(function () {
+  var REPO = 'UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code';
+  var meta = document.getElementById('dl-meta');
+
+  function mb(n) { return (n / 1048576).toFixed(0) + ' MB'; }
+  function set(id, asset) {
+    var el = document.getElementById(id);
+    if (el && asset) el.href = asset.browser_download_url;
+    return asset;
+  }
+
+  fetch('https://api.github.com/repos/' + REPO + '/releases/latest', {
+    headers: { Accept: 'application/vnd.github+json' }
+  })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (rel) {
+      var assets = rel.assets || [];
+      var find = function (re) {
+        for (var i = 0; i < assets.length; i++) if (re.test(assets[i].name)) return assets[i];
+      };
+      var setup = find(/Setup.*\.exe$/i);
+      var portable = find(/portable\.exe$/i);
+      var vsix = find(/\.vsix$/i);
+
+      set('dl-main', setup || portable);
+      set('dl-setup', setup);
+      set('dl-portable', portable);
+      set('dl-vsix', vsix);
+
+      if (meta && (setup || portable)) {
+        var a = setup || portable;
+        meta.textContent = rel.tag_name + ' · ' + mb(a.size) + ' · Windows 10/11 64-bit · free and open source';
+      }
+    })
+    .catch(function () {
+      /* Leave the /releases/latest fallbacks exactly as rendered. */
+    });
+})();
+</script>
 </body>
 </html>
