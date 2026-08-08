@@ -5,11 +5,19 @@
  * of this interface and no other agent is supported or has been made to work.
  *
  * This is an internal seam, NOT a capability. Do not read it as "works with any
- * agent" -- the entire design depends on Claude Code's HTTP hook system, which
- * is specific to Claude Code. Other CLI agents do not emit these events, so
- * supporting one would mean finding a completely different observation
- * mechanism for it, not writing a small adapter against this interface. The
- * abstraction exists because the registry and the merged-state handling are
+ * agent".
+ *
+ * The blocker is TRANSPORT, not events. Codex CLI and Gemini CLI both have hook
+ * systems with strikingly similar event names and payload fields -- but both run
+ * local commands only, handing the JSON to a script on stdin. Codex's docs are
+ * explicit that only `type: "command"` handlers run. Claude Code is currently
+ * the only one that can POST a hook event to an HTTP URL, and this app's
+ * receiver is HTTP, so nothing from the others ever arrives.
+ *
+ * Bridging one is feasible -- a relay script reading stdin and POSTing to the
+ * receiver, plus a per-agent config installer and payload verification against
+ * real captures -- but that is real work, not a new file against this interface.
+ * The abstraction exists because the registry and the merged-state handling are
  * genuinely simpler expressed this way, and it keeps the UI from hardcoding a
  * single-session layout.
  *

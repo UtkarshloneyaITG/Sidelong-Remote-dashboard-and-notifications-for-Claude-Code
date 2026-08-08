@@ -152,14 +152,18 @@
     </tr>
     <tr>
       <td><strong>Watch Codex, Gemini, or any agent other than Claude Code</strong></td>
-      <td><strong>Not supported, and not close to supported.</strong> Everything here is built
-      on Claude Code's HTTP hook system, which is specific to Claude Code — other CLI agents
-      simply do not emit these events. The repository contains an <code>AgentAdapter</code>
-      interface with exactly <strong>one</strong> implementation; that is an internal seam
-      that keeps the registry and the multi-session UI tidy, <strong>not</strong> a plug-in
-      point that makes another agent work. Supporting one would mean finding a whole
-      different observation mechanism, not writing a small adapter.
-      <strong>Tested against Codex: it does not work.</strong></td>
+      <td><strong>Not supported. Tested against Codex: it does not work.</strong> The reason
+      is <em>transport</em>, not events — worth stating precisely, because “they have no
+      hooks” would be wrong. Codex CLI has hooks (<code>SessionStart</code>,
+      <code>PreToolUse</code>, <code>PostToolUse</code>, <code>PermissionRequest</code>,
+      <code>Stop</code>…), and so does Gemini CLI, with similar payload fields. But
+      <strong>both run local commands only</strong>, delivering JSON on stdin — Codex's docs
+      state plainly that only <code>type: "command"</code> handlers run. Claude Code is
+      currently the only one that can POST a hook event to an HTTP URL, and this app's
+      receiver is HTTP, so nothing from the others arrives. Bridging one is <em>feasible</em>:
+      a relay script that reads stdin and POSTs to the receiver, plus a per-agent config
+      installer and payload verification against real captures. A genuine piece of work, not
+      a small adapter.</td>
     </tr>
     <tr>
       <td><strong>Read Claude Code's in-memory state</strong></td>

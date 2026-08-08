@@ -72,11 +72,18 @@ stops, and you find out when you happen to look. Multiply that by a dozen times 
 | **Zero risk to your session** | Hook failures are non-blocking by design. Killing the overlay cannot affect Claude Code — measured, not assumed. |
 
 > [!IMPORTANT]
-> **Claude Code only.** Everything here is built on Claude Code's HTTP hook system, which
-> is specific to Claude Code. **Codex, Gemini and other CLI agents do not work** — they emit
-> no such events, and this has been tested rather than assumed. The repository contains an
-> `AgentAdapter` interface with exactly one implementation; that is an internal seam, not a
-> plug-in point that makes another agent work.
+> **Claude Code only — and the reason is transport, not events.**
+>
+> Codex and Gemini CLI both have hook systems, with strikingly similar event names
+> (`PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`…) and similar payload fields. But
+> **both run local commands only** and talk over stdin/stdout. Claude Code is currently the
+> only one that can POST a hook event to an HTTP URL, and Sidelong's receiver is HTTP — so
+> nothing from Codex or Gemini ever reaches it. **Tested against Codex: it does not work.**
+>
+> Bridging one would take a small relay script (read the JSON on stdin, POST it to the
+> receiver), a per-agent config installer, and payload verification against real captures.
+> That is a real piece of work, not a small adapter — the `AgentAdapter` interface has
+> exactly one implementation and is an internal seam, not a plug-in point.
 
 > [!NOTE]
 > **What it deliberately does not do.** It never approves or denies anything (`[ok]` means

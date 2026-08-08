@@ -19,12 +19,22 @@ code — each entry names the root cause rather than the symptom.
   Gemini adapter as "a new file plus one `register()` call". Both read as
   multi-agent support. They were wrong: Codex was tested and does not work.
 
-  Everything here depends on Claude Code's HTTP hook system, which is specific to
-  Claude Code — other CLI agents emit no such events, so supporting one would
-  mean a completely different observation mechanism, not a small adapter. The
-  `AgentAdapter` interface has exactly one implementation and is an internal seam,
-  not a plug-in point. Now stated as such in the README, the docs site, the
-  capability ledger and the package itself.
+  The reason is **transport, not events** — worth stating precisely, because
+  "other agents have no hooks" would be equally wrong. Checked against current
+  documentation: **Codex CLI and Gemini CLI both have hook systems**, with
+  strikingly similar event names (`PreToolUse`, `PostToolUse`, `Stop`,
+  `SessionStart`…) and similar payload fields. But **both run local commands
+  only**, handing JSON to a script on stdin; Codex's docs state plainly that only
+  `type: "command"` handlers run. Claude Code is currently the only one that can
+  POST a hook event to an HTTP URL, and this app's receiver is HTTP — so nothing
+  from the others ever arrives.
+
+  Supporting another agent is therefore *feasible* — a relay script that reads
+  stdin and POSTs to the receiver, plus a per-agent config installer and payload
+  verification against real captures — but it is real work, not a new file
+  against the `AgentAdapter` interface. That interface has exactly one
+  implementation and is an internal seam, not a plug-in point. Now stated as such
+  in the README, the docs site, the capability ledger and the package itself.
 
 ---
 
