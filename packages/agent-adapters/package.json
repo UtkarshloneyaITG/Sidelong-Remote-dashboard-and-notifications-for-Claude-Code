@@ -1,6 +1,6 @@
 {
   "name": "@agent-watcher/agent-adapters",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "description": "AgentAdapter interface plus the Claude Code adapter. Keeps the overlay agnostic about which agent it is watching.",
