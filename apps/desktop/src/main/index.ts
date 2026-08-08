@@ -86,6 +86,14 @@ function decide(sessionId: string, behavior: 'allow' | 'deny' | 'defer'): boolea
   if (!hold) return false;
   holds.delete(sessionId);
   hold.settle(behavior === 'defer' ? null : { behavior });
+
+  // Answering IS dealing with it. Without this the prompt stays "actionable"
+  // until PostToolUse lands, so the acknowledge pair would pop up the instant
+  // Allow was clicked -- offering to remind you about something you just decided.
+  if (behavior !== 'defer') {
+    const key = currentView().sessions.find((s) => s.sessionId === sessionId)?.permissionKey;
+    if (key) acknowledged[sessionId] = key;
+  }
   pushView();
   return true;
 }
@@ -284,6 +292,10 @@ async function startServers(): Promise<void> {
     token: cfg.token,
     // Zero disables holding entirely, which is the default.
     decisionWindowMs: cfg.permissionDecisions ? cfg.decisionWindowMs : 0,
+    // Drop the buttons the moment the request is gone, however it went.
+    onDecisionClosed: (sessionId) => {
+      if (holds.delete(sessionId)) setImmediate(pushView);
+    },
     onDecisionRequest: cfg.permissionDecisions
       ? (env, settle, deadline) => {
           const id = env.event.session_id;

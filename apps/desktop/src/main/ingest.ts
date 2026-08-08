@@ -43,6 +43,12 @@ export interface IngestOptions {
   ) => void;
   /** How long a PermissionRequest may be held. 0 disables holding entirely. */
   decisionWindowMs?: number;
+  /**
+   * The held request is gone -- Claude Code hung up, or we settled it. The UI
+   * must drop its Allow/Deny buttons now rather than counting down against a
+   * request nobody is waiting on any more.
+   */
+  onDecisionClosed?: (sessionId: string) => void;
 }
 
 export class PortInUseError extends Error {
@@ -198,10 +204,15 @@ export class IngestServer {
     let done = false;
     let timer: NodeJS.Timeout | undefined;
 
+    const closed = (): void => {
+      this.opts.onDecisionClosed?.(envelope.event.session_id);
+    };
+
     const settle = (decision: Decision): void => {
       if (done) return;
       done = true;
       if (timer) clearTimeout(timer);
+      closed();
       if (res.writableEnded || res.destroyed) return;
       if (!decision) {
         // No decision: hand it back to Claude Code's own permission flow.
@@ -222,10 +233,14 @@ export class IngestServer {
 
     // Claude Code gave up or the session died -- stop waiting on a click that can
     // no longer matter.
+    // Claude Code gave up, the turn was interrupted, or the session died. Nobody
+    // is waiting on this any more, so the buttons must go immediately rather than
+    // sitting there counting down.
     res.on('close', () => {
       if (!done) {
         done = true;
         if (timer) clearTimeout(timer);
+        closed();
       }
     });
 

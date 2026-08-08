@@ -70,11 +70,14 @@ function clock(ms: number): string {
 /** Elapsed, ticked locally between pushes. Derived from a real turnStartedAt. */
 function useElapsed(session: SessionView | undefined): number {
   const [, tick] = useState(0);
+  // Also ticks while a decision is open, so its countdown moves every second
+  // rather than only when a view happens to be pushed.
+  const live = Boolean(session?.turnStartedAt) || Boolean(session?.decision);
   useEffect(() => {
-    if (!session?.turnStartedAt) return;
+    if (!live) return;
     const id = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(id);
-  }, [session?.turnStartedAt]);
+  }, [live]);
   if (!session) return 0;
   return session.turnStartedAt ? Date.now() - session.turnStartedAt : session.elapsedMs;
 }
@@ -111,7 +114,12 @@ function useOpenEditor(): [string | null, (sessionId?: string) => void] {
 
 function PermissionCard({ session }: { session: SessionView }): JSX.Element | null {
   const [hint, open] = useOpenEditor();
-  const p = session.permissionActionable ? session.pendingPermission : undefined;
+  // A live decision counts as actionable regardless of the grace window: if we
+  // can answer it, the card must show it, or the bar would offer Allow/Deny while
+  // the expanded card showed nothing for the first 700ms.
+  const p = session.permissionActionable || session.decision
+    ? session.pendingPermission
+    : undefined;
   if (!p) return null;
   return (
     <div className="mx-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
@@ -122,15 +130,35 @@ function PermissionCard({ session }: { session: SessionView }): JSX.Element | nu
         {p.detail}
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <button
-          type="button"
-          className="no-drag rounded-md bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-900 transition hover:bg-white"
-          onClick={() => open(session.sessionId)}
-        >
-          Open VS Code
-        </button>
-        {/* V1 observes only. There is deliberately no Allow/Deny here -- see
-            README section on Phase 6. */}
+        {session.decision ? (
+          <>
+            <button
+              type="button"
+              className="no-drag rounded-md bg-emerald-400 px-2.5 py-1 text-[11px] font-semibold text-emerald-950 transition hover:bg-emerald-300"
+              onClick={() => void window.watcher.decide(session.sessionId, 'allow')}
+            >
+              Allow
+            </button>
+            <button
+              type="button"
+              className="no-drag rounded-md border border-rose-500/50 px-2.5 py-1 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/10"
+              onClick={() => void window.watcher.decide(session.sessionId, 'deny')}
+            >
+              Deny
+            </button>
+            <span className="font-mono text-[10px] tabular-nums text-zinc-500">
+              {Math.max(0, Math.ceil((session.decision.expiresAt - Date.now()) / 1000))}s
+            </span>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="no-drag rounded-md bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-900 transition hover:bg-white"
+            onClick={() => open(session.sessionId)}
+          >
+            Open VS Code
+          </button>
+        )}
         <span className="text-[10px] text-zinc-500">
           {hint ?? (p.source === 'Notification' ? 'via notification' : p.tool)}
         </span>
@@ -271,10 +299,15 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
   const [hint, open] = useOpenEditor();
   const a = view.active;
   const severity: Severity = a?.severity ?? 'offline';
+  // While we can actually ANSWER the prompt, Allow/Deny replaces the
+  // acknowledge pair entirely. Showing both would offer four buttons for one
+  // decision, and the hidden pair would still be clickable and tab-reachable
+  // underneath the overlaid group.
+  const deciding = Boolean(a?.decision);
   // permissionActionable, NOT pendingPermission: a prompt about to be
   // auto-approved must not put buttons in front of you for a command that is
   // already running.
-  const pending = a?.permissionActionable ? a.pendingPermission : undefined;
+  const pending = !deciding && a?.permissionActionable ? a.pendingPermission : undefined;
   // Always say what Claude is DOING -- reading, writing, running, thinking --
   // rather than a status label. Computed once in the protocol so the bar and the
   // expanded card can never disagree.
@@ -303,7 +336,7 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
           below re-flows when a command starts, ends, or a prompt arrives. */}
       {hint ? (
         <span className="min-w-0 flex-1 truncate text-[11px] text-amber-300">{hint}</span>
-      ) : asCommand ? (
+      ) : asCommand || deciding ? (
         <span
           className={`min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-[11.5px] transition-colors duration-300 ${
             pending ? 'bg-amber-500/12 text-amber-100' : 'bg-zinc-800/80 text-zinc-300'
@@ -348,29 +381,42 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
         and Claude Code prompts you normally instead. Nothing is lost when it
         runs out.
       */}
-      {a?.decision && (
-        <span className="absolute inset-y-0 right-7 z-10 flex items-center gap-1.5 bg-zinc-950 pl-8">
-          <span className="font-mono text-[10px] tabular-nums text-zinc-500">
-            {Math.max(0, Math.ceil((a.decision.expiresAt - Date.now()) / 1000))}s
-          </span>
-          <button
-            type="button"
-            title="Run it. This actually approves the tool call."
-            className="no-drag rounded-md bg-emerald-400 px-2.5 py-1 text-[11px] font-semibold text-emerald-950 transition hover:bg-emerald-300"
-            onClick={() => void window.watcher.decide(a.sessionId, 'allow')}
-          >
-            Allow
-          </button>
-          <button
-            type="button"
-            title="Refuse it. Claude is told the call was denied."
-            className="no-drag rounded-md border border-rose-500/50 px-2.5 py-1 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/10"
-            onClick={() => void window.watcher.decide(a.sessionId, 'deny')}
-          >
-            Deny
-          </button>
+      <span
+        aria-hidden={!deciding}
+        className={`pointer-events-none absolute inset-y-0 right-7 z-10 flex items-center gap-1.5 pl-10 transition-all duration-200 ease-out ${
+          deciding ? 'translate-x-0 opacity-100' : 'translate-x-1 opacity-0'
+        }`}
+        style={{
+          background:
+            'linear-gradient(to right, rgba(9,9,11,0) 0%, rgba(9,9,11,0.97) 38%, rgba(9,9,11,0.97) 100%)',
+        }}
+      >
+        <span className="font-mono text-[10px] tabular-nums text-zinc-500">
+          {a?.decision ? `${Math.max(0, Math.ceil((a.decision.expiresAt - Date.now()) / 1000))}s` : ''}
         </span>
-      )}
+        <button
+          type="button"
+          tabIndex={deciding ? 0 : -1}
+          title="Run it. This actually approves the tool call."
+          className={`no-drag rounded-md bg-emerald-400 px-2.5 py-1 text-[11px] font-semibold text-emerald-950 transition hover:bg-emerald-300 ${
+            deciding ? 'pointer-events-auto' : ''
+          }`}
+          onClick={() => a?.decision && void window.watcher.decide(a.sessionId, 'allow')}
+        >
+          Allow
+        </button>
+        <button
+          type="button"
+          tabIndex={deciding ? 0 : -1}
+          title="Refuse it. Claude is told the call was denied."
+          className={`no-drag rounded-md border border-rose-500/50 px-2.5 py-1 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/10 ${
+            deciding ? 'pointer-events-auto' : ''
+          }`}
+          onClick={() => a?.decision && void window.watcher.decide(a.sessionId, 'deny')}
+        >
+          Deny
+        </button>
+      </span>
 
       {/*
         Actions FLOAT over the right end of the bar rather than sitting in the
