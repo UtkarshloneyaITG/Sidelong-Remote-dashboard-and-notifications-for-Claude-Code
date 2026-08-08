@@ -174,8 +174,24 @@ state, no duplication.
 > runners, so you can check exactly what produced the file you downloaded — or build
 > it yourself with `npm run dist -w @agent-watcher/desktop`.
 
-After installing, launch it and run `node tools/install-hooks.mjs install` from a clone
-to wire up the hooks — or use the **Hooks** panel inside the app, which needs no clone.
+After installing, launch it and use the **Hooks** panel inside the app (expand the bar →
+**Hooks** → **Install**) — no clone needed. From a clone you can instead run
+`node tools/install-hooks.mjs install`.
+
+### Keeping it around
+
+The installer creates **Desktop and Start-menu shortcuts**, and the tray menu has a
+**Start with Windows** toggle.
+
+> [!NOTE]
+> **An installer cannot pin anything to your taskbar.** Windows removed that API
+> deliberately, so no application can pin itself — it has to be your click. Right-click
+> the Start-menu or Desktop shortcut → **Pin to taskbar**. The overlay itself sets
+> `skipTaskbar`, so it never shows a taskbar button of its own; the **tray icon** is how
+> you tell it is running and how you get it back.
+>
+> Windows 11 hides new tray icons behind the **`^`** chevron. Drag it out to keep it
+> visible.
 
 ## Quick start (from source)
 

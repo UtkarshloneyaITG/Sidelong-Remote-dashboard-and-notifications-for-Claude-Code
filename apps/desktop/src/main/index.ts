@@ -315,6 +315,8 @@ function debugLog(env: { event: { hook_event_name?: string; session_id?: string;
   }
 }
 
+const startsWithWindows = (): boolean => app.getLoginItemSettings().openAtLogin;
+
 /** Short status line for the tray tooltip and its first menu entry. */
 function trayLabel(view: OverlayView): string {
   const a = view.active;
@@ -365,6 +367,18 @@ function refreshTray(view: OverlayView): void {
       },
     },
     { type: 'separator' },
+    {
+      label: 'Start with Windows',
+      type: 'checkbox',
+      checked: startsWithWindows(),
+      // Only meaningful for an installed build: in development this would
+      // register the bare electron.exe, which starts nothing useful.
+      enabled: app.isPackaged,
+      click: (item) => {
+        app.setLoginItemSettings({ openAtLogin: item.checked, path: process.execPath });
+        refreshTray(currentView());
+      },
+    },
     {
       label: hookMessage ? 'Hooks need attention' : 'Hooks installed',
       enabled: false,

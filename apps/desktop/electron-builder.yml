@@ -30,6 +30,16 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   artifactName: Sidelong-Setup-${version}.${ext}
+  # Shortcuts the installer CAN create. Windows deliberately offers no API for
+  # pinning to the taskbar -- Microsoft removed it so installers cannot hijack
+  # it -- so pinning stays a manual right-click on one of these shortcuts.
+  # "Start with Windows" is offered inside the app instead, from the tray menu.
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sidelong
+  runAfterFinish: true
+  allowElevation: false
+  deleteAppDataOnUninstall: false
 
 portable:
   artifactName: Sidelong-${version}-portable.${ext}
