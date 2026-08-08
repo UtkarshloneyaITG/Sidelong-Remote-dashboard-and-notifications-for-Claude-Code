@@ -127,7 +127,7 @@ See [docs/CAPABILITIES.md](docs/CAPABILITIES.md). The significant ones: permissi
 during model inference; and macOS and Linux build in CI but their overlay
 behaviour is untested.
 
-[0.1.3]: https://github.com/UtkarshloneyaITG/Sidelong/releases/tag/v0.1.3
-[0.1.2]: https://github.com/UtkarshloneyaITG/Sidelong/releases/tag/v0.1.2
-[0.1.1]: https://github.com/UtkarshloneyaITG/Sidelong/releases/tag/v0.1.1
-[0.1.0]: https://github.com/UtkarshloneyaITG/Sidelong/releases/tag/v0.1.0
+[0.1.3]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.3
+[0.1.2]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.2
+[0.1.1]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.1
+[0.1.0]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.0

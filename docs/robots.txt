@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://utkarshloneyaitg.github.io/Sidelong/sitemap.xml
+Sitemap: https://utkarshloneyaitg.github.io/sidelong-claude-code-status-bar/sitemap.xml
