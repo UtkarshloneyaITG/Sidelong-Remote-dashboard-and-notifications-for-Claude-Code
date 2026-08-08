@@ -179,13 +179,16 @@ function createWindow(): BrowserWindow {
     y: cfg.bounds?.y ?? area.y + 24,
     frame: false,
     transparent: true,
-    resizable: true,
-    // Size the CONTENT, not the window rect. A frameless resizable window on
-    // Windows still carries an invisible resize border, and without this the
-    // card ends up a few pixels short of what the layout was designed for.
+    // Not user-resizable. Both modes are fixed sizes the layout is designed
+    // around, and a manual resize was discarded on the next toggle anyway -- so
+    // the drag handles only ever let you stretch the bar into something wrong.
+    // setContentSize still works programmatically, which is how expand/minimize
+    // changes it.
+    resizable: false,
+    // Size the CONTENT, not the window rect: a frameless window on Windows still
+    // carries an invisible border, and without this the card ends up a few pixels
+    // short of what the layout expects.
     useContentSize: true,
-    minWidth: 220,
-    minHeight: 40,
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
@@ -207,8 +210,9 @@ function createWindow(): BrowserWindow {
   w.setAlwaysOnTop(true, 'screen-saver');
   w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
+  // Only 'moved': the window is no longer user-resizable, and size always comes
+  // from the mode constants rather than anything persisted.
   w.on('moved', () => saveBounds(w));
-  w.on('resized', () => saveBounds(w));
   w.on('closed', () => { win = undefined; });
 
   if (process.env.ELECTRON_RENDERER_URL) {

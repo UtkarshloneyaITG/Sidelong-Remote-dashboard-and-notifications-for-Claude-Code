@@ -70,6 +70,9 @@ stops, and you find out when you happen to look. Multiply that by a dozen times 
 | **Quiet when you're already looking** | With the bridge extension, notifications are suppressed while VS Code has focus. |
 | **Long silences don't lie** | A long build or a thinking model dims the bar — it never flips to "error" or "idle" on a timeout. |
 | **Zero risk to your session** | Hook failures are non-blocking by design. Killing the overlay cannot affect Claude Code — measured, not assumed. |
+| **Answer prompts from the bar** *(opt-in)* | **Allow** / **Deny** without switching apps. Off by default — see [Permission decisions](#permission-decisions--allow--deny). |
+| **Act straight from the notification** | The toast carries an **Open VS Code** button, so you skip the overlay entirely. |
+| **See what waiting costs you** | The expanded card totals how long Claude actually sat blocked on you today. Nothing else can compute it. |
 
 > [!IMPORTANT]
 > **Claude Code only — and the reason is transport, not events.**
@@ -349,7 +352,9 @@ No environment variables, no `.env`. One JSON file, created on first launch:
 | `shortcut` | `Control+Shift+Space` | Global show/minimize shortcut. |
 | `staleMs` | `90000` | Silence after which a working session dims. **Never changes its status.** |
 | `completedDismissMs` | `20000` | How long a completed turn stays expanded. `0` disables. |
-| `debugLog` | `false` | Opt-in local debug logging. Off by default — payloads are sensitive. |
+| `debugLog` | `false` | Opt-in local logging of event **names only**, never payloads. Off by default. |
+| `permissionDecisions` | `false` | Enable **Allow / Deny**. Changing it requires reinstalling the hooks. |
+| `decisionWindowMs` | `15000` | How long a prompt may be held. The longest this app can ever stall one tool call. |
 
 > [!IMPORTANT]
 > The port and token live in a **settings file**, so both must be stable across launches. A
@@ -562,24 +567,61 @@ pieces. Worth noting that the one failure mode people actually care about here i
 covered by design rather than by a legal disclaimer — hook failures are
 non-blocking, so Sidelong cannot take your coding session down with it.
 
-## Roadmap — permission controls
+## Permission decisions — Allow / Deny
 
-`PermissionRequest` accepts a decision in the response body:
+**Off by default.** Switching it on changes what this app is: a watcher gains the ability to
+run things.
+
+```jsonc
+// %APPDATA%\agent-watcher-desktop\config.json
+"permissionDecisions": true,
+"decisionWindowMs": 15000
+```
+
+Then **reinstall the hooks** — `node tools/install-hooks.mjs install`. Toggling changes the
+installed `PermissionRequest` timeout, and drift detection compares timeouts, so the app
+tells you rather than leaving a 5-second hook that cuts every decision short.
+
+With it on, a permission prompt holds its HTTP response open and the bar shows **Allow** /
+**Deny** with a countdown. Clicking answers Claude Code directly with the documented body:
 
 ```json
 { "hookSpecificOutput": { "hookEventName": "PermissionRequest",
   "decision": { "behavior": "allow" } } }
 ```
 
-So real `[Allow]` / `[Deny]` buttons are achievable through a supported mechanism, and the
-ingest handler is already shaped so a response body *could* be returned.
+### Why it is safe to leave on, and where it isn't
+
+> [!IMPORTANT]
+> **Silence never approves.** Every path that is not an explicit click — the window lapsing,
+> a crash, Claude Code hanging up, quitting the app, a newer prompt superseding this one, the
+> feature being off — ends as an **empty `204`**. Claude Code documents that as *"no
+> decision"* and falls back to prompting you normally. The reference is explicit: *"staying
+> silent doesn't approve it."*
+
+Measured against the running app:
+
+| Path | Result |
+|---|---|
+| Any non-permission event | `204` in **81 ms** — still 204-and-forget |
+| **Allow** clicked | `200` with exactly the decision body above |
+| No click | empty `204` at **15.0 s** → VS Code prompts as usual |
+| Second prompt supersedes the first | first hold released at **2.8 s**, empty |
+| Claude Code hangs up | buttons drop within ~2 s, not at the deadline |
+
+Only `PermissionRequest` may ever hold. A test asserts that enabling decisions leaves every
+other hook's timeout **byte-identical**, so this can't become a licence to loosen the rest.
+`settle()` runs at most once, so a click racing the deadline can't write to a finished
+response. The IPC channel names no command and carries no path — a session id and one of
+three fixed verbs, refused outright when the feature is off.
 
 > [!CAUTION]
-> **Deliberately not implemented.** Returning a decision means holding the HTTP response open
-> until you click, which **blocks that tool call** for the whole time — against a 600-second
-> default timeout. That behaviour needs to be understood and tested before it is trusted, and
-> an overlay that can approve tool calls is a meaningfully larger security surface than one
-> that only watches. It deserves its own threat model.
->
-> Until then: observe, notify, offer `[Open VS Code]`. **`[ok]` acknowledges only. It never
-> simulates approval.**
+> **The real cost, which no design removes.** While a decision is outstanding the tool call is
+> blocked and **VS Code's own prompt does not appear**. If you ignore the overlay, you have
+> *delayed* the normal prompt by up to `decisionWindowMs`. Mitigated by answering instantly
+> with "no decision" whenever the bridge reports VS Code already has focus — which is exactly
+> when the overlay is useless — but that needs the bridge extension installed.
+
+**`[ok]` is still not approval.** It acknowledges: the bar stops drawing attention and
+nothing is sent to Claude Code. When a decision is live, `[ok]` and `[Open VS Code]` are
+hidden entirely so one prompt never offers four buttons.

@@ -216,9 +216,19 @@
     </figure>
   </div>
 
+    <figure class="shot--bar">
+      <img src="assets/bar-decision.png" width="704" height="74" loading="lazy"
+           alt="Sidelong bar showing Run npm install? with a 13 second countdown and green Allow and red Deny buttons.">
+      <figcaption>Answering it — <strong>opt-in, off by default</strong>. The countdown is how
+      long until the hold lapses and VS Code prompts you instead; nothing is lost when it runs
+      out. While a decision is live, <em>Open VS Code</em> and <em>ok</em> are hidden, so one
+      prompt never offers four buttons.</figcaption>
+    </figure>
+  </div>
+
   <div class="shots shots--split" style="margin-top:34px">
     <figure>
-      <img src="assets/expanded.png" width="441" height="540" loading="lazy"
+      <img src="assets/expanded.png" width="441" height="538" loading="lazy"
            alt="Sidelong expanded card showing a completion summary, an activity timeline with a failed npm test, two changed files, and connection status.">
       <figcaption>The expanded card</figcaption>
     </figure>
@@ -254,6 +264,12 @@
       <p>With the VS Code bridge, notifications stay quiet while VS Code has focus.</p></div>
     <div class="cell"><span class="cell__n">06</span><h3>Cannot break your session</h3>
       <p>Hook failures are non-blocking by design. Kill the app mid-run and Claude Code doesn't notice.</p></div>
+    <div class="cell"><span class="cell__n">07</span><h3>Allow / Deny <span style="color:var(--text-3);font-family:var(--mono);font-size:11px">opt-in</span></h3>
+      <p>Answer a prompt from the bar. Off by default — silence never approves, and every other path falls back to VS Code's own prompt.</p></div>
+    <div class="cell"><span class="cell__n">08</span><h3>Act from the toast</h3>
+      <p><em>Open VS Code</em> is a button on the notification itself, so you skip the overlay.</p></div>
+    <div class="cell"><span class="cell__n">09</span><h3>What waiting costs</h3>
+      <p>Totals how long Claude actually sat blocked on you today. Nothing else can measure it.</p></div>
   </div>
 </section>
 

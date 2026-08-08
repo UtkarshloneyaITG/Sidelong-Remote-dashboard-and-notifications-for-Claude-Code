@@ -9,32 +9,71 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
-## [Unreleased]
+## [0.1.5] — 2026-08-08
+
+### Added
+
+- **Permission decisions — real Allow / Deny.** `PermissionRequest` can be held
+  open and answered with the documented decision body. **Off by default**: it
+  changes what this app is, since a watcher gains the ability to run things.
+  Enabling it requires reinstalling the hooks, and drift detection now compares
+  timeouts so a stale 5-second hook cannot silently cut every decision short.
+
+  Measured against the running app: any non-permission event still returns `204`
+  in **81 ms**; a real Allow returns `200` with exactly the decision payload; no
+  click lapses to an empty `204` at **15.0 s**; a superseding prompt releases the
+  first hold at **2.8 s**; a client hangup drops the buttons in ~2 s.
+
+  **Silence never approves.** Every non-explicit path — lapse, crash, hangup,
+  quit, superseded, feature off — sends an empty `204`, which Claude Code treats
+  as "no decision" and falls back to prompting you normally. The reference is
+  explicit: *"staying silent doesn't approve it."*
+
+  The unavoidable cost: while a decision is outstanding, **VS Code's own prompt
+  does not appear**, so ignoring the overlay delays it by up to
+  `decisionWindowMs`. Mitigated by answering instantly with "no decision" when
+  the bridge reports VS Code already has focus.
+
+- **Open VS Code as a toast button.** Verified against the Electron docs that
+  action buttons are supported on Windows (macOS additionally needs a signed app
+  with an `alert` alert-style, where it degrades to the toast body).
+
+- **Time blocked on you, per day.** Accumulated in the reducer from prompts that
+  outlived the grace window and banked per local day. Auto-approved and
+  interrupted prompts contribute nothing, so it under-counts rather than
+  over-counts — a test walks all eight ways a prompt can end and asserts they
+  bank the same amount.
 
 ### Changed
 
 - **Removed the implication that other agents are supported.** The
-  `agent-adapters` package described itself as keeping the overlay "agnostic
-  about which agent it is watching", and its header offered adding a Codex or
-  Gemini adapter as "a new file plus one `register()` call". Both read as
-  multi-agent support. They were wrong: Codex was tested and does not work.
+  `agent-adapters` package claimed to keep the overlay "agnostic about which
+  agent it is watching" and offered a Codex or Gemini adapter as "a new file
+  plus one `register()` call". Codex was tested: it does not work. The reason is
+  **transport, not events** — Codex CLI and Gemini CLI both have hook systems
+  with strikingly similar event names, but both run local commands only and hand
+  JSON to a script on stdin. Claude Code is currently the only one that can POST
+  a hook event to an HTTP URL, which is what this app receives. Supporting
+  another agent is feasible via a relay script, but it is real work, not a new
+  file against an interface that has exactly one implementation.
+- **The overlay window is no longer user-resizable.** Both modes are fixed sizes
+  the layout is designed around, and a manual resize was discarded on the next
+  toggle anyway — so the drag handles only ever let you stretch the bar into
+  something wrong. Programmatic expand/minimize is unaffected.
 
-  The reason is **transport, not events** — worth stating precisely, because
-  "other agents have no hooks" would be equally wrong. Checked against current
-  documentation: **Codex CLI and Gemini CLI both have hook systems**, with
-  strikingly similar event names (`PreToolUse`, `PostToolUse`, `Stop`,
-  `SessionStart`…) and similar payload fields. But **both run local commands
-  only**, handing JSON to a script on stdin; Codex's docs state plainly that only
-  `type: "command"` handlers run. Claude Code is currently the only one that can
-  POST a hook event to an HTTP URL, and this app's receiver is HTTP — so nothing
-  from the others ever arrives.
+### Fixed
 
-  Supporting another agent is therefore *feasible* — a relay script that reads
-  stdin and POSTs to the receiver, plus a per-agent config installer and payload
-  verification against real captures — but it is real work, not a new file
-  against the `AgentAdapter` interface. That interface has exactly one
-  implementation and is an internal seam, not a plug-in point. Now stated as such
-  in the README, the docs site, the capability ledger and the package itself.
+- Allow/Deny and `[Open VS Code]`/`[ok]` could render together — four buttons for
+  one decision, with the hidden pair still clickable and tab-reachable underneath.
+  A live decision now suppresses the acknowledge pair, and deciding also marks the
+  prompt acknowledged so it does not reappear the instant Allow is clicked.
+- An abandoned hold left the buttons counting down against a request nobody was
+  waiting on. Closure is now reported and the hold dropped immediately.
+- Allow/Deny mounted and unmounted abruptly while the acknowledge pair faded; both
+  now use the identical always-mounted, opacity-only treatment.
+- Blocked-time stats were only flushed on `will-quit`, which never fires on a
+  force-kill — so the figure vanished exactly when someone exercises the
+  kill-the-app property this project advertises. Now flushed on the view tick.
 
 ---
 
@@ -176,6 +215,7 @@ See [docs/CAPABILITIES.md](docs/CAPABILITIES.md). The significant ones: permissi
 during model inference; and macOS and Linux build in CI but their overlay
 behaviour is untested.
 
+[0.1.5]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.5
 [0.1.4]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.4
 [0.1.3]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.3
 [0.1.2]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.2

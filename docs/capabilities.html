@@ -105,6 +105,22 @@
       <td>Hook connection failure, timeout and non-2xx are all non-blocking by design.</td>
       <td>Tool calls ran in <strong>39 ms and 67 ms</strong> with every hook pointed at a dead server.</td>
     </tr>
+    <tr>
+      <td><strong>Approving or denying a prompt</strong><br><span class="tag-part">opt-in · off by default</span></td>
+      <td>The <code>PermissionRequest</code> response is held open and answered with the
+      documented decision body. Measured live: allow returns <code>200</code> with exactly
+      that payload; no click lapses to an empty <code>204</code> at 15.0&nbsp;s; a superseding
+      prompt releases the first at 2.8&nbsp;s; a client hangup drops the buttons in ~2&nbsp;s.</td>
+      <td><strong>Every non-explicit path is an empty <code>204</code></strong> — lapse, crash,
+      hangup, quit, feature off — which Claude Code treats as “no decision” and falls back to
+      prompting you normally. The cost: while a decision is outstanding <strong>VS Code's own
+      prompt does not appear</strong>, so ignoring the overlay delays it by up to the window.</td>
+    </tr>
+    <tr>
+      <td><strong>Time spent blocked on you</strong></td>
+      <td>Accumulated per session from prompts that outlived the grace window, banked per local day.</td>
+      <td>Auto-approved and interrupted prompts contribute nothing — it under-counts rather than over-counts.</td>
+    </tr>
   </table>
 </section>
 
@@ -186,8 +202,12 @@
       <td><code>SessionEnd</code> doesn't fire on <code>kill -9</code>. The session just stops emitting, which is indistinguishable from a long think. Resolved by a TTL, not a guess.</td>
     </tr>
     <tr>
-      <td><strong>Approve permissions <span style="color:var(--text-3)">(v1, by choice)</span></strong></td>
-      <td>Mechanically supported — <code>PermissionRequest</code> accepts a decision in the response body — but deliberately not built. It means holding the HTTP response open until you click, blocking that tool call against a 600-second default timeout, and an overlay that can approve tool calls deserves its own threat model. <strong>[ok] acknowledges only.</strong></td>
+      <td><strong>Approve a prompt without switching apps</strong></td>
+      <td><strong>This one moved.</strong> It is now built and opt-in — see the supported table
+      above. It stayed unbuilt for a while because holding the response open blocks the tool
+      call, and an overlay that can approve tool calls is a larger security surface than one
+      that only watches. Both are still true; the difference is that the fallback is now
+      measured rather than assumed. <strong>[ok] still acknowledges only.</strong></td>
     </tr>
   </table>
 </section>

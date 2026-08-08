@@ -4,7 +4,7 @@
   "displayName": "Agent Watcher Bridge",
   "description": "Sends workspace, active editor, focus and diagnostics to the Agent Watcher overlay. It cannot observe Claude Code's state — that comes from hooks.",
   "license": "MIT",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "publisher": "agent-watcher",
   "engines": {
