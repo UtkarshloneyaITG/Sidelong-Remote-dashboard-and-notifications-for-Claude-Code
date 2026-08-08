@@ -9,10 +9,11 @@
  * window geometry, focus, or hook installation -- none of them touch agent state.
  */
 
-import { statSync } from 'node:fs';
+import { appendFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  BrowserWindow, app, dialog, globalShortcut, ipcMain, screen, shell,
+  BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage,
+  screen, shell,
 } from 'electron';
 import {
   PERMISSION_GRACE_MS, buildView, hookBaseUrl, prunable,
@@ -58,6 +59,7 @@ let win: BrowserWindow | undefined;
 let ingest: IngestServer | undefined;
 let bridge: BridgeServer | undefined;
 let notifier: Notifier | undefined;
+let tray: Tray | undefined;
 let collapseTimer: NodeJS.Timeout | undefined;
 let graceTimer: NodeJS.Timeout | undefined;
 let hookMessage: string | undefined;
@@ -163,6 +165,7 @@ function pushView(): void {
   const view = currentView();
   win?.webContents.send('view', { ...view, expanded: loadConfig().expanded });
   notifier?.update(view);
+  refreshTray(view);
 
   // A prompt inside its grace window becomes actionable on a clock, not on an
   // event. Schedule the exact push that flips it, so a real permission surfaces
@@ -193,6 +196,7 @@ async function startServers(): Promise<void> {
     port: cfg.port,
     token: cfg.token,
     onEvent: (env) => {
+      debugLog(env);
       claude.ingest(env);
       const gone = prunable(claude.getState(), Date.now(), SESSION_TTL_MS);
       for (const id of gone) {
@@ -281,6 +285,93 @@ function acknowledgeWhereVsCodeIsFocused(): void {
   for (const s of currentView().sessions) {
     if (s.permissionKey && s.bridge?.focused) acknowledged[s.sessionId] = s.permissionKey;
   }
+}
+
+/**
+ * Opt-in local diagnostic log: WHICH events arrived and when, never what they
+ * contained.
+ *
+ * Deliberately no payload. `tool_input` carries whole file contents, full command
+ * strings and prompt text, and a debug flag is exactly the switch someone leaves
+ * on by accident -- so this records only the event name, matcher, tool name and a
+ * truncated session id. All of that is structural, none of it is your source.
+ *
+ * Enable with "debugLog": true in config.json. Written next to it.
+ */
+function debugLog(env: { event: { hook_event_name?: string; session_id?: string; tool_name?: string }; matcher?: string }): void {
+  if (!loadConfig().debugLog) return;
+  const e = env.event;
+  const line = [
+    new Date().toISOString(),
+    (e.hook_event_name ?? '?').padEnd(20),
+    (env.matcher ?? '-').padEnd(18),
+    (e.session_id ?? '?').slice(0, 8),
+    e.tool_name ?? '',
+  ].join(' ') + '\n';
+  try {
+    appendFileSync(join(app.getPath('userData'), 'debug.log'), line);
+  } catch {
+    /* diagnostics must never take the app down */
+  }
+}
+
+/** Short status line for the tray tooltip and its first menu entry. */
+function trayLabel(view: OverlayView): string {
+  const a = view.active;
+  if (!a) return view.ingestReady ? 'No Claude Code session' : 'Receiver down';
+  const where = a.project ? `${a.project} — ` : '';
+  return `${where}${a.headline}`.slice(0, 110);
+}
+
+/**
+ * A tray icon, because the overlay sets `skipTaskbar` and has no title bar.
+ * Without this there is no way to tell the app is running, and no way to get it
+ * back if you hide it other than remembering the global shortcut.
+ */
+function createTray(): void {
+  if (tray) return;
+  // Tray art wants ~16px; the source mark is 320px, so downscale explicitly
+  // rather than letting Windows do it badly.
+  const icon = nativeImage.createFromPath(ICON_PATH).resize({ width: 16, height: 16 });
+  tray = new Tray(icon);
+  tray.setToolTip('Sidelong');
+  // Left click is the obvious "bring it back" gesture.
+  tray.on('click', () => {
+    if (!win) win = createWindow();
+    else win.showInactive();
+  });
+  refreshTray(currentView());
+}
+
+function refreshTray(view: OverlayView): void {
+  if (!tray) return;
+  const label = trayLabel(view);
+  tray.setToolTip(`Sidelong — ${label}`);
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label, enabled: false },
+    { type: 'separator' },
+    {
+      label: 'Show overlay',
+      click: () => {
+        if (!win) win = createWindow();
+        else win.showInactive();
+      },
+    },
+    {
+      label: loadConfig().expanded ? 'Minimize to bar' : 'Expand',
+      click: () => {
+        win?.showInactive();
+        setExpanded(!loadConfig().expanded);
+      },
+    },
+    { type: 'separator' },
+    {
+      label: hookMessage ? 'Hooks need attention' : 'Hooks installed',
+      enabled: false,
+    },
+    { type: 'separator' },
+    { label: 'Quit Sidelong', click: () => app.quit() },
+  ]));
 }
 
 function refreshHookStatus(): void {
@@ -425,6 +516,7 @@ if (!app.requestSingleInstanceLock()) {
       setExpanded(true);
     }, ICON_PATH);
     registerShortcut();
+    createTray();
     setInterval(pushView, VIEW_TICK_MS);
     pushView();
   });
@@ -436,6 +528,8 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('will-quit', async () => {
     globalShortcut.unregisterAll();
+    tray?.destroy();
+    tray = undefined;
     bridge?.close();
     await ingest?.close();
     await registry.stopAll();
