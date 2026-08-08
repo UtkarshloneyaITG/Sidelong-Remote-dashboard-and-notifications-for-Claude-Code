@@ -14,10 +14,10 @@ when it is silently waiting on a permission prompt.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-hooks-D97757?logo=anthropic&logoColor=white)
-[![CI](https://github.com/UtkarshloneyaITG/Sidelong/actions/workflows/ci.yml/badge.svg)](https://github.com/UtkarshloneyaITG/Sidelong/actions/workflows/ci.yml)
-[![Release](https://github.com/UtkarshloneyaITG/Sidelong/actions/workflows/release.yml/badge.svg)](https://github.com/UtkarshloneyaITG/Sidelong/actions/workflows/release.yml)
-[![License](https://img.shields.io/github/license/UtkarshloneyaITG/Sidelong?color=F5B544)](LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/UtkarshloneyaITG/Sidelong/total?color=F5B544)](https://github.com/UtkarshloneyaITG/Sidelong/releases)
+[![CI](https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/actions/workflows/ci.yml/badge.svg)](https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/actions/workflows/ci.yml)
+[![Release](https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/actions/workflows/release.yml/badge.svg)](https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code?color=F5B544)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/total?color=F5B544)](https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases)
 
 [Why](#why-this-exists) · [What you get](#what-you-get) · [Architecture](#architecture) · [Quick start](#quick-start) · [Using it](#using-it) · [Capabilities](#capabilities) · [Security](#security)
 
@@ -117,7 +117,7 @@ stops, and you find out when you happen to look. Multiply that by a dozen times 
 > **The state machine is a pure function** — `(state, event) → state` in
 > [`packages/protocol/src/reducer.ts`](packages/protocol/src/reducer.ts). No I/O, no timers,
 > no `Date.now()`, no Electron imports. That function is the product; everything else is
-> plumbing around it. It is what the 58 tests test.
+> plumbing around it. It is what the 61 tests test.
 
 ### Components
 
@@ -162,9 +162,9 @@ state, no duplication.
 
 | | |
 |---|---|
-| **[Sidelong-Setup-x.y.z.exe](https://github.com/UtkarshloneyaITG/Sidelong/releases/latest)** | Windows installer. Start-menu entry, per-user, no admin. |
-| **[Sidelong-x.y.z-portable.exe](https://github.com/UtkarshloneyaITG/Sidelong/releases/latest)** | Single file, run it from anywhere. Nothing installed. |
-| **[agent-watcher-bridge.vsix](https://github.com/UtkarshloneyaITG/Sidelong/releases/latest)** | Optional VS Code extension. |
+| **[Sidelong-Setup-x.y.z.exe](https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest)** | Windows installer. Start-menu entry, per-user, no admin. |
+| **[Sidelong-x.y.z-portable.exe](https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest)** | Single file, run it from anywhere. Nothing installed. |
+| **[agent-watcher-bridge.vsix](https://github.com/UtkarshloneyaITG/Sidelong-Remote-dashboard-and-notifications-for-Claude-Code/releases/latest)** | Optional VS Code extension. |
 
 > [!NOTE]
 > The binaries are **unsigned** — a code-signing certificate costs a few hundred
@@ -386,7 +386,7 @@ The headline limits, stated plainly:
 
 ```bash
 npm run dev          # electron-vite dev, HMR on the renderer
-npm test             # the reducer suite — 58 tests
+npm test             # the reducer suite — 61 tests
 npm run typecheck    # all four workspaces
 npm run build        # everything
 
@@ -400,7 +400,7 @@ node tools/capture/capture.mjs fixtures/raw.jsonl      # record your own fixture
 
 ## Testing
 
-**The reducer is the product, so the reducer is what is tested** — 58 tests over a corpus of
+**The reducer is the product, so the reducer is what is tested** — 61 tests over a corpus of
 **real captured hook payloads**, asserting state *sequences*, not just end states.
 
 Pinned down: activity lines come from real tool input and are never invented ·
