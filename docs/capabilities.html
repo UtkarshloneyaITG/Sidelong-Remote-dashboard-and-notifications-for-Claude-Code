@@ -151,6 +151,17 @@
       <td><strong>Permission grants are silent — no hook fires.</strong> The order is <code>PreToolUse → PermissionRequest → PostToolUse</code> with nothing between; only denials by the auto-mode classifier get an event. So approving in VS Code leaves the earliest hard evidence at the tool <em>finishing</em>. Mitigated by acknowledgement on focus or on <strong>[Open VS Code]</strong> — never by claiming approval.</td>
     </tr>
     <tr>
+      <td><strong>Watch Codex, Gemini, or any agent other than Claude Code</strong></td>
+      <td><strong>Not supported, and not close to supported.</strong> Everything here is built
+      on Claude Code's HTTP hook system, which is specific to Claude Code — other CLI agents
+      simply do not emit these events. The repository contains an <code>AgentAdapter</code>
+      interface with exactly <strong>one</strong> implementation; that is an internal seam
+      that keeps the registry and the multi-session UI tidy, <strong>not</strong> a plug-in
+      point that makes another agent work. Supporting one would mean finding a whole
+      different observation mechanism, not writing a small adapter.
+      <strong>Tested against Codex: it does not work.</strong></td>
+    </tr>
+    <tr>
       <td><strong>Read Claude Code's in-memory state</strong></td>
       <td>No API exposes another extension's internals. The VS Code Extension API cannot see inside Claude Code at all. This is the assumption that sinks naive versions of this project.</td>
     </tr>
