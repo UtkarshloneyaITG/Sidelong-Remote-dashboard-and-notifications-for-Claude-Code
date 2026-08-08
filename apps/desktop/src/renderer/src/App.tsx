@@ -22,6 +22,7 @@ declare global {
       openEditor(sessionId?: string): Promise<{ via: string }>;
       acknowledge(sessionId: string, key: string): Promise<void>;
       decide(sessionId: string, behavior: 'allow' | 'deny' | 'defer'): Promise<{ ok: boolean }>;
+      resize(width: number, height: number): Promise<void>;
       quit(): Promise<void>;
       hooks: {
         status(): Promise<HookStatusPayload>;
@@ -80,6 +81,41 @@ function useElapsed(session: SessionView | undefined): number {
   }, [live]);
   if (!session) return 0;
   return session.turnStartedAt ? Date.now() - session.turnStartedAt : session.elapsedMs;
+}
+
+/**
+ * Resize grips, drawn in the page rather than by the OS.
+ *
+ * A transparent frameless window gets no resize border on Windows — measured:
+ * `WS_THICKFRAME` is absent whatever `resizable` is set to. Native drag-resize
+ * and rounded corners cannot both exist, so the grips live here and main clamps
+ * whatever they ask for.
+ *
+ * `screenX/Y` rather than `clientX/Y`: the window is moving underneath the
+ * pointer as it resizes, so window-relative coordinates feed back on themselves.
+ */
+function useGrip(axis: 'x' | 'xy'): (e: React.PointerEvent) => void {
+  return useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.screenX;
+    const startY = e.screenY;
+    const startW = window.innerWidth;
+    const startH = window.innerHeight;
+
+    const move = (ev: PointerEvent): void => {
+      // The capsule is anchored at its right edge, so dragging LEFT widens it.
+      const width = startW + (startX - ev.screenX) * (axis === 'x' ? 1 : -1);
+      const height = axis === 'xy' ? startH + (ev.screenY - startY) : startH;
+      void window.watcher.resize(Math.round(width), Math.round(height));
+    };
+    const up = (): void => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }, [axis]);
 }
 
 function Dot({ severity, pulse }: { severity: Severity; pulse?: boolean }): JSX.Element {
@@ -297,6 +333,7 @@ function Setup({ onClose }: { onClose: () => void }): JSX.Element {
  */
 function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }): JSX.Element {
   const [hint, open] = useOpenEditor();
+  const grip = useGrip('x');
   const a = view.active;
   const severity: Severity = a?.severity ?? 'offline';
   // While we can actually ANSWER the prompt, Allow/Deny replaces the
@@ -320,6 +357,18 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
         pending ? 'border-amber-500/60' : 'border-zinc-700/80'
       }`}
     >
+      {/* Width-only grip on the left edge: the capsule is anchored top-right, so
+          it grows leftwards into free screen rather than off the edge. */}
+      <span
+        onPointerDown={grip}
+        title="Drag to resize"
+        className="absolute inset-y-0 left-0 z-20 w-3 cursor-ew-resize"
+        // Inline, not just the .no-drag class: window dragging is resolved in the
+        // compositor before JS runs, so if this region is draggable the pointer
+        // moves the window and the grip never sees the event.
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      />
+
       <span className="flex shrink-0 items-center gap-2 pl-0.5">
         <Dot severity={severity} pulse={Boolean(pending) || (a?.status === 'WORKING' && !a.stale)} />
         <span className="max-w-[110px] truncate text-[11.5px] font-medium text-zinc-200">
@@ -490,6 +539,7 @@ export default function App(): JSX.Element {
   const [view, setView] = useState<RendererView | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [openHint, openEditor] = useOpenEditor();
+  const cornerGrip = useGrip('xy');
 
   useEffect(() => {
     void window.watcher.getView().then(setView);
@@ -630,6 +680,19 @@ export default function App(): JSX.Element {
         <ConnectionRow view={view} />
         {setupOpen && <Setup onClose={() => setSetupOpen(false)} />}
       </div>
+
+      {/* Both-axis grip in the bottom-right corner, where one belongs. */}
+      <span
+        onPointerDown={cornerGrip}
+        title="Drag to resize"
+        className="absolute bottom-0 right-0 z-20 h-5 w-5 cursor-nwse-resize"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        <svg viewBox="0 0 16 16" className="absolute bottom-[3px] right-[3px] h-2.5 w-2.5" aria-hidden="true">
+          <path d="M15 7 L7 15 M15 11 L11 15" stroke="currentColor" strokeWidth="1.4"
+                className="text-zinc-600" strokeLinecap="round" fill="none" />
+        </svg>
+      </span>
     </div>
   );
 }

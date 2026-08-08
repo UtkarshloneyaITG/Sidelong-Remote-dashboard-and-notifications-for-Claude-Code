@@ -48,8 +48,54 @@ export const ICON_PATH = join(app.getAppPath(), 'resources', 'icon.png');
  * content adapts inside it: the command truncates, and the buttons fade in on
  * top of its right edge instead of taking layout space.
  */
-const BAR = { width: 560, height: 56 };
-const EXPANDED = { width: 348, height: 428 };
+const BAR_HEIGHT = 56;
+/**
+ * Resize limits per mode.
+ *
+ * The capsule resizes HORIZONTALLY ONLY -- its height is locked, because a taller
+ * capsule is just a broken capsule, while a wider one genuinely shows more of the
+ * command. The expanded card resizes on both axes.
+ */
+const BAR_MIN_WIDTH = 360;
+const BAR_MAX_WIDTH = 1600;
+const EXPANDED_MIN = { width: 300, height: 240 };
+const EXPANDED_MAX = { width: 1200, height: 1200 };
+/** Content size for a mode, honouring whatever you last dragged it to. */
+function modeSize(expanded: boolean): { width: number; height: number } {
+  const cfg = loadConfig();
+  return expanded
+    ? { width: cfg.expandedSize.width, height: cfg.expandedSize.height }
+    : { width: cfg.barWidth, height: BAR_HEIGHT };
+}
+
+const clamp = (v: number, lo: number, hi: number): number =>
+  Math.round(Math.min(hi, Math.max(lo, v)));
+
+/**
+ * Apply a resize asked for by a renderer grip, clamped to what the mode allows.
+ *
+ * The capsule takes width only and keeps its RIGHT edge anchored, because it
+ * lives in the top-right corner -- growing rightwards would walk it off screen.
+ * The card takes both axes and grows down-right from its top-left, which is what
+ * a bottom-right corner grip should do.
+ */
+function resizeTo(width: number, height: number): void {
+  if (!win) return;
+  if (loadConfig().expanded) {
+    const w = clamp(width, EXPANDED_MIN.width, EXPANDED_MAX.width);
+    const h = clamp(height, EXPANDED_MIN.height, EXPANDED_MAX.height);
+    win.setContentSize(w, h);
+    updateConfig({ expandedSize: { width: w, height: h } });
+    return;
+  }
+  const w = clamp(width, BAR_MIN_WIDTH, BAR_MAX_WIDTH);
+  const before = win.getBounds();
+  const rightEdge = before.x + before.width;
+  win.setContentSize(w, BAR_HEIGHT);
+  const after = win.getBounds();
+  win.setPosition(rightEdge - after.width, before.y);
+  updateConfig({ barWidth: w });
+}
 /** Recompute elapsed/staleness. Cannot change a status -- buildView never does. */
 const VIEW_TICK_MS = 2_000;
 /** A DISCONNECTED session is forgotten after this long. */
@@ -169,7 +215,7 @@ registry.register(claude);
 
 function createWindow(): BrowserWindow {
   const cfg = loadConfig();
-  const size = cfg.expanded ? EXPANDED : BAR;
+  const size = modeSize(cfg.expanded);
   const area = screen.getPrimaryDisplay().workArea;
 
   const w = new BrowserWindow({
@@ -179,11 +225,11 @@ function createWindow(): BrowserWindow {
     y: cfg.bounds?.y ?? area.y + 24,
     frame: false,
     transparent: true,
-    // Not user-resizable. Both modes are fixed sizes the layout is designed
-    // around, and a manual resize was discarded on the next toggle anyway -- so
-    // the drag handles only ever let you stretch the bar into something wrong.
-    // setContentSize still works programmatically, which is how expand/minimize
-    // changes it.
+    // A TRANSPARENT frameless window gets no OS resize border on Windows --
+    // measured: WS_THICKFRAME is absent whatever this is set to, in both modes.
+    // Native drag-resize and rounded corners are mutually exclusive, so resizing
+    // is done with grips in the renderer calling `ui:resize`, and the limits are
+    // enforced in main rather than by the window.
     resizable: false,
     // Size the CONTENT, not the window rect: a frameless window on Windows still
     // carries an invisible border, and without this the card ends up a few pixels
@@ -210,9 +256,15 @@ function createWindow(): BrowserWindow {
   w.setAlwaysOnTop(true, 'screen-saver');
   w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-  // Only 'moved': the window is no longer user-resizable, and size always comes
-  // from the mode constants rather than anything persisted.
   w.on('moved', () => saveBounds(w));
+  // Remember what you dragged it to, per mode -- otherwise the next toggle would
+  // silently throw the resize away.
+  w.on('resized', () => {
+    const [cw, ch] = w.getContentSize();
+    if (loadConfig().expanded) updateConfig({ expandedSize: { width: cw, height: ch } });
+    else updateConfig({ barWidth: cw });
+    saveBounds(w);
+  });
   w.on('closed', () => { win = undefined; });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -235,9 +287,7 @@ function saveBounds(w: BrowserWindow): void {
 function setExpanded(expanded: boolean): void {
   updateConfig({ expanded });
   if (!win) return;
-  // setContentSize keeps the CSS card exactly the size the layout assumes.
-  // The bar is a fixed size, so this is the ONLY place the window ever resizes.
-  const size = expanded ? EXPANDED : BAR;
+  const size = modeSize(expanded);
   win.setContentSize(size.width, size.height);
   pushView();
 }
@@ -529,6 +579,17 @@ function registerIpc(): void {
     setExpanded(Boolean(expanded));
   });
   ipcMain.handle('ui:quit', () => app.quit());
+
+  /**
+   * A resize grip was dragged. Geometry only -- it cannot touch agent state.
+   * Limits are enforced here rather than by the window, because a transparent
+   * window has no OS resize border to enforce them.
+   */
+  ipcMain.handle('ui:resize', (_e, width: unknown, height: unknown) => {
+    if (typeof width !== 'number' || typeof height !== 'number') return;
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+    resizeTo(width, height);
+  });
 
   /**
    * [ok] on the bar. Records "I have seen this prompt" so the bar shrinks and

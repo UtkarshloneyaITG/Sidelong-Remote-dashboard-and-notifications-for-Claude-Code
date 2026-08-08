@@ -278,7 +278,16 @@ a reliable `[Open VS Code]` target, git branch and diagnostics.
 
 ### The bar
 
-The resting state, a **fixed size** — it never resizes as commands come and go.
+The resting state. It **never resizes itself** as commands come and go — but you can
+resize it: drag the **left edge** of the capsule to widen it (width only; a taller capsule
+is just a broken capsule), and the **bottom-right corner** of the expanded card for both
+axes. Your size is remembered per mode.
+
+> [!NOTE]
+> The grips are drawn in the page, not by Windows. A **transparent** frameless window gets
+> no OS resize border — measured: `WS_THICKFRAME` is absent whatever `resizable` is set to.
+> Native drag-resize and rounded corners cannot both exist, so the grips are ours and the
+> limits are enforced in the main process.
 
 | State | What you see |
 |-------|--------------|
@@ -355,6 +364,8 @@ No environment variables, no `.env`. One JSON file, created on first launch:
 | `debugLog` | `false` | Opt-in local logging of event **names only**, never payloads. Off by default. |
 | `permissionDecisions` | `false` | Enable **Allow / Deny**. Changing it requires reinstalling the hooks. |
 | `decisionWindowMs` | `15000` | How long a prompt may be held. The longest this app can ever stall one tool call. |
+| `barWidth` | `560` | Capsule width, remembered from the left-edge grip. Height is fixed. |
+| `expandedSize` | `348×428` | Card size, remembered from the corner grip. |
 
 > [!IMPORTANT]
 > The port and token live in a **settings file**, so both must be stable across launches. A

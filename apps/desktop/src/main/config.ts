@@ -55,6 +55,14 @@ export interface AppConfig {
    */
   decisionWindowMs: number;
   expanded: boolean;
+  /**
+   * Width of the minimized bar. Height is fixed: the capsule resizes
+   * horizontally only, because a taller capsule is just a broken capsule, while
+   * a wider one genuinely shows more of the command.
+   */
+  barWidth: number;
+  /** Size of the expanded card, which resizes on both axes. */
+  expandedSize: { width: number; height: number };
   bounds?: { x: number; y: number; width: number; height: number };
 }
 
@@ -69,6 +77,8 @@ const DEFAULTS: Omit<AppConfig, 'token'> = {
   permissionDecisions: false,
   decisionWindowMs: 15_000,
   expanded: false,
+  barWidth: 560,
+  expandedSize: { width: 348, height: 428 },
 };
 
 let cached: AppConfig | undefined;
