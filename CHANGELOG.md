@@ -9,7 +9,18 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
-## [Unreleased]
+## [1.0.0] — 2026-08-10
+
+The version number is a **licence boundary**, not a claim that the code changed
+shape. Going from MIT to Prosperity revokes nothing already granted, but it does
+change the terms for everything from here on, and that is exactly what a major
+version is for: v0.x is MIT, v1.x is not. Anyone who wants the MIT terms takes
+v0.1.9, and the number tells them where the line is without reading a word.
+
+What it is **not** claiming: that the untested surfaces got tested, or that
+platforms beyond Windows 11 got verified. Both are still written down in
+[`docs/CAPABILITIES.md`](docs/CAPABILITIES.md) and the README's testing section,
+unchanged, because a version bump is not evidence.
 
 ### Changed
 
@@ -500,6 +511,7 @@ See [docs/CAPABILITIES.md](docs/CAPABILITIES.md). The significant ones: permissi
 during model inference; and macOS and Linux build in CI but their overlay
 behaviour is untested.
 
+[1.0.0]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.0.0
 [0.1.9]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v0.1.9
 [0.1.8]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v0.1.8
 [0.1.7]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v0.1.7
