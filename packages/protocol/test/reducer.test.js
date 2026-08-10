@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 import { loadFixture } from '../../../tools/replay.mjs';
 import {
-  absoluteFile,
+  absoluteFile, commandKey,
   buildHookConfig, buildView, describePermission, describeTool, findDrift, allowlistProblem,
   PERMISSION_GRACE_MS, humanGap, decisionTimeoutSeconds,
   initialState, isStale, mergeHooks, reduce, reduceAll, removeHooks, severityOf, shortPath,
@@ -268,6 +268,32 @@ test('but a stale message from an older turn does not masquerade as the question
     ),
   ]);
   assert.equal(only(after).message, 'Claude is waiting for your input');
+});
+
+// ------------------------------------------------------- command key (on disk)
+
+test('commandKey keeps the verb and nothing else', () => {
+  const k = (input, tool = 'Bash') => commandKey(tool, describePermission(tool, input));
+  assert.equal(k({ command: 'npm test' }), 'npm test');
+  assert.equal(k({ command: 'npm run build -- --watch' }), 'npm run');
+  assert.equal(k({ command: 'git push origin main' }), 'git push');
+  assert.equal(k({ command: 'rm -rf build' }), 'rm', 'not subcommanded, so just the program');
+  assert.equal(k({ command: '/usr/local/bin/npm ci' }), 'npm ci', 'the path is not part of it');
+  assert.equal(k({ command: 'C:\\tools\\make.exe all' }), 'make all', 'Windows must not fork the key');
+  assert.equal(k({ file_path: '/w/src/app.ts' }, 'Edit'), 'Edit', 'non-Bash degrades to the tool');
+});
+
+test('commandKey never lets payload text reach the key', () => {
+  const k = (cmd) => commandKey('Bash', describePermission('Bash', { command: cmd }));
+  // A secret in argument position must not survive into a file kept for 30 days.
+  assert.equal(k('curl -H "Authorization: Bearer sk-abc123" https://x.test'), 'curl');
+  assert.equal(k('git push https://user:pw@host/repo main'), 'git push');
+  assert.equal(k('AWS_SECRET=hunter2 aws s3 sync .'), 'Bash', 'VAR=value is not a bare word');
+  assert.equal(k('"/opt/my tools/run.sh" --key=abc'), 'Bash', 'a quoted path is not a bare word');
+  for (const key of [k('curl -H "Authorization: Bearer sk-abc123" https://x.test'),
+                     k('git push https://user:pw@host/repo main')]) {
+    assert.ok(!/sk-abc123|user:pw|Authorization/.test(key), `leaked: ${key}`);
+  }
 });
 
 // ------------------------------------------------------------ invariants

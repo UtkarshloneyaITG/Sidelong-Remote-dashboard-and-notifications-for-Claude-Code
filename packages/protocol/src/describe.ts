@@ -136,6 +136,65 @@ export function describeTool(
   }
 }
 
+/**
+ * Programs where the SUBCOMMAND is the verb: `npm test` and `npm publish` are
+ * not the same request, and collapsing both to "npm" would answer nobody's
+ * question about what they keep being asked.
+ */
+const SUBCOMMANDED = new Set([
+  'npm', 'pnpm', 'yarn', 'bun', 'git', 'cargo', 'docker', 'go', 'make',
+  'dotnet', 'poetry', 'bundle', 'composer', 'kubectl', 'terraform', 'gh',
+]);
+
+/** A bare word. Deliberately excludes spaces, quotes, slashes and `=`. */
+const WORD = /^[A-Za-z0-9_.@-]+$/;
+
+/**
+ * A plain path, with no quoting or substitution in it.
+ *
+ * Checked on the RAW first token, before any basename is taken. Splitting on
+ * whitespace tears a quoted path in half — `"/opt/my tools/run.sh"` becomes
+ * `"/opt/my`, whose basename is the bare word `my`, so a fragment of somebody's
+ * directory would have gone into a file kept for 30 days. A leading quote is the
+ * signal that the split was wrong, so anything carrying one is refused outright.
+ */
+const PATHLIKE = /^[A-Za-z0-9_.@:\\/-]+$/;
+
+/** `make.exe` and `make` are one program. Windows should not fork the key. */
+const EXE = /\.(exe|cmd|bat|ps1)$/i;
+
+/**
+ * A low-cardinality key for "what does Claude keep asking me about".
+ *
+ * This one is written to DISK and kept for 30 days, which nothing else derived
+ * from a tool input is. So it takes the program name and — only for the handful
+ * of tools where the subcommand is the verb — one subcommand, and both must be
+ * a bare word. A flag, a path, a URL, a quoted string, an inline environment
+ * variable or anything else that could carry a secret fails that test and the
+ * key degrades to the tool name, which carries nothing at all.
+ *
+ * It reads the rendered permission line rather than the raw input because that
+ * is what the state keeps. Living next to `describePermission` is the point:
+ * the format it parses is the format written six lines below it.
+ */
+export function commandKey(toolName: string | undefined, detail: string): string {
+  const fallback = toolName || 'unknown';
+  const run = /^Run `(.+?)`\?$/.exec(detail);
+  if (!run) return fallback;
+
+  const tokens = run[1].trim().split(/\s+/);
+  const raw = tokens[0] ?? '';
+  if (!PATHLIKE.test(raw)) return fallback;
+  // Strip any directory part: `/usr/local/bin/npm` and `npm` are one thing, and
+  // the path itself is not something to keep.
+  const prog = (raw.split(/[\\/]/).pop() ?? '').replace(EXE, '');
+  if (!WORD.test(prog)) return fallback;
+
+  const sub = tokens[1];
+  if (SUBCOMMANDED.has(prog) && sub && WORD.test(sub)) return `${prog} ${sub}`;
+  return prog;
+}
+
 /** The permission line: "Run `npm install`?" rather than "needs permission". */
 export function describePermission(
   toolName: string | undefined,

@@ -16,7 +16,7 @@ import {
   screen, shell,
 } from 'electron';
 import {
-  PERMISSION_GRACE_MS, buildView, hookBaseUrl, prunable,
+  PERMISSION_GRACE_MS, buildView, commandKey, hookBaseUrl, prunable,
   type BridgeInfo, type OverlayView,
 } from '@agent-watcher/protocol';
 import { AdapterRegistry, ClaudeCodeAdapter } from '@agent-watcher/agent-adapters';
@@ -209,6 +209,24 @@ const ZERO_COUNTS: DayCounts = {
 };
 let countsByDay: Record<string, DayCounts> = {};
 
+/**
+ * day -> `commandKey` -> how many prompts asked about it.
+ *
+ * Answers "what does Claude keep asking me about", which is the one statistic
+ * here you can act on: what shows up repeatedly belongs in your allowlist, and
+ * then it stops interrupting you. See `commandKey` for why only a program name
+ * and at most one subcommand are ever written down.
+ */
+let commandsByDay: Record<string, Record<string, number>> = {};
+
+function bumpCommand(key: string): void {
+  const day = dayKey();
+  const row = commandsByDay[day] ?? {};
+  row[key] = (row[key] ?? 0) + 1;
+  commandsByDay[day] = row;
+  statsDirty = true;
+}
+
 function bump(field: keyof DayCounts, by = 1): void {
   const day = dayKey();
   const row = countsByDay[day] ?? { ...ZERO_COUNTS };
@@ -236,7 +254,7 @@ function accruePrompts(view: {
     sessionId: string;
     permissionActionable?: boolean;
     permissionKey?: string;
-    pendingPermission?: { at: number };
+    pendingPermission?: { at: number; tool?: string; detail: string };
   }[];
 }): void {
   const live = new Set<string>();
@@ -247,6 +265,7 @@ function accruePrompts(view: {
     if (!openPrompts.has(id) && s.permissionActionable) {
       openPrompts.set(id, s.pendingPermission.at);
       bump('prompts');
+      bumpCommand(commandKey(s.pendingPermission.tool, s.pendingPermission.detail));
     }
   }
 
@@ -302,6 +321,16 @@ function loadStats(): void {
           .map(([k, v]) => [k, { ...ZERO_COUNTS, ...(v as Partial<DayCounts>) }]),
       );
     }
+    if (obj.commandsByDay && typeof obj.commandsByDay === 'object') {
+      commandsByDay = Object.fromEntries(
+        Object.entries(obj.commandsByDay as Record<string, unknown>)
+          .filter(([, v]) => v && typeof v === 'object')
+          .map(([day, v]) => [day, Object.fromEntries(
+            Object.entries(v as Record<string, unknown>)
+              .filter(([, n]) => typeof n === 'number' && Number.isFinite(n)) as [string, number][],
+          )]),
+      );
+    }
   } catch {
     /* first run, or a corrupt file we would rather ignore than crash on */
   }
@@ -320,8 +349,10 @@ function saveStats(): void {
   blockedByDay = Object.fromEntries(keep.map((k) => [k, blockedByDay[k]]));
   const keepCounts = Object.keys(countsByDay).sort().slice(-STATS_KEEP_DAYS);
   countsByDay = Object.fromEntries(keepCounts.map((k) => [k, countsByDay[k]]));
+  const keepCmds = Object.keys(commandsByDay).sort().slice(-STATS_KEEP_DAYS);
+  commandsByDay = Object.fromEntries(keepCmds.map((k) => [k, commandsByDay[k]]));
   try {
-    writeFileSync(statsFile(), JSON.stringify({ blockedByDay, countsByDay }), 'utf8');
+    writeFileSync(statsFile(), JSON.stringify({ blockedByDay, countsByDay, commandsByDay }), 'utf8');
   } catch {
     /* a stat we cannot persist is not worth failing a launch over */
   }
@@ -732,7 +763,9 @@ function registerIpc(): void {
    * quiet week look identical to a busy one.
    */
   ipcMain.handle('ui:stats', () => {
-    const days: { date: string; blockedMs: number; counts: DayCounts }[] = [];
+    const days: {
+      date: string; blockedMs: number; counts: DayCounts; commands: Record<string, number>;
+    }[] = [];
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() - (STATS_KEEP_DAYS - 1));
@@ -742,6 +775,7 @@ function registerIpc(): void {
         date: key,
         blockedMs: blockedByDay[key] ?? 0,
         counts: countsByDay[key] ?? { ...ZERO_COUNTS },
+        commands: commandsByDay[key] ?? {},
       });
       d.setDate(d.getDate() + 1);
     }

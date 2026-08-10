@@ -51,7 +51,13 @@ interface DayCounts {
 
 interface StatsPayload {
   /** Oldest first, one row per local day, gaps filled with real zeroes. */
-  days: { date: string; blockedMs: number; counts: DayCounts }[];
+  days: {
+    date: string;
+    blockedMs: number;
+    counts: DayCounts;
+    /** `commandKey` → prompts about it. Program name and one subcommand only. */
+    commands: Record<string, number>;
+  }[];
 }
 
 interface HookStatusPayload {
@@ -462,6 +468,23 @@ function savings(rows: DayCounts[]): { perPrompt: number; total: number; answere
   return { perPrompt, total: perPrompt * t.answered, answered: t.answered, elsewhere: t.elsewhere };
 }
 
+/**
+ * The same range again, immediately before it — so "12m" can become "12m, down
+ * from 20m". A total on its own does not answer the only question anyone asks
+ * of it, which is whether things are getting better.
+ *
+ * Returns null unless the whole previous window is present in the retained 30
+ * days, and unless it is non-zero: a percentage against nothing is a division
+ * by zero dressed as an insight.
+ */
+function trend(all: StatsPayload['days'], range: number): { delta: number; prev: number } | null {
+  if (all.length < range * 2) return null;
+  const sum = (rows: StatsPayload['days']): number => rows.reduce((a, d) => a + d.blockedMs, 0);
+  const prev = sum(all.slice(-range * 2, -range));
+  if (prev <= 0) return null;
+  return { delta: (sum(all.slice(-range)) - prev) / prev, prev };
+}
+
 function Analysis({ onClose }: { onClose: () => void }): JSX.Element {
   const [stats, setStats] = useState<StatsPayload | null>(null);
   const [range, setRange] = useState<number>(7);
@@ -470,7 +493,20 @@ function Analysis({ onClose }: { onClose: () => void }): JSX.Element {
     void window.watcher.stats().then(setStats);
   }, []);
 
-  const days = (stats?.days ?? []).slice(-range);
+  const all = stats?.days ?? [];
+  const days = all.slice(-range);
+  const move = trend(all, range);
+
+  // What Claude keeps asking about, most-asked first. Summed across the range
+  // rather than per day, because the point is the pattern, not when it happened.
+  const asked = Object.entries(
+    days.reduce<Record<string, number>>((acc, d) => {
+      for (const [k, n] of Object.entries(d.commands)) acc[k] = (acc[k] ?? 0) + n;
+      return acc;
+    }, {}),
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
   const counts = days.map((d) => d.counts);
   const peak = Math.max(1, ...days.map((d) => d.blockedMs));
   const total = counts.reduce(
@@ -517,7 +553,21 @@ function Analysis({ onClose }: { onClose: () => void }): JSX.Element {
       {/* Waiting per day. One bar per day including the empty ones -- dropping a
           quiet day would silently rescale the axis and make a quiet week look
           exactly like a busy one. */}
-      <div className="mt-3 text-[10px] uppercase tracking-wider text-zinc-600">Claude waiting on you</div>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-zinc-600">Claude waiting on you</span>
+        {move && (
+          // Down is good here: the number is time you cost Claude, not time you
+          // earned. Green for a fall, amber for a rise.
+          <span
+            className={`ml-auto font-mono text-[10px] tabular-nums ${
+              move.delta < 0 ? 'text-emerald-400/90' : 'text-amber-400/90'
+            }`}
+            title={`Previous ${range} days: ${dur(move.prev)}`}
+          >
+            {move.delta < 0 ? '▼' : '▲'} {Math.abs(Math.round(move.delta * 100))}% vs prev {range}d
+          </span>
+        )}
+      </div>
       {/* shrink-0 as well as block layout above: whatever this ends up nested
           in, the chart keeps its 96px. It is the point of the panel. */}
       <div className="mt-1.5 flex h-24 shrink-0 items-end gap-[2px]">
@@ -575,9 +625,32 @@ function Analysis({ onClose }: { onClose: () => void }): JSX.Element {
         ))}
       </div>
 
+      {/* The one statistic here you can act on. Everything else describes what
+          happened; this says what to change so it stops happening. */}
+      {asked.length > 0 && (
+        <div className="mt-3 rounded border border-zinc-800 p-2">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600">Keeps asking about</div>
+          <div className="mt-1.5 space-y-1">
+            {asked.map(([key, n]) => (
+              <div key={key} className="flex items-baseline gap-2">
+                <span className="truncate font-mono text-[11px] text-zinc-300">{key}</span>
+                <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-zinc-500">
+                  ×{n}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[9px] leading-relaxed text-zinc-600">
+            Anything here that you always approve belongs in your Claude Code permission
+            allowlist — then it stops interrupting you at all.
+          </p>
+        </div>
+      )}
+
       <p className="mt-3 text-[9.5px] leading-relaxed text-zinc-600">
         Every figure here is a tally of hook events that actually arrived, kept for 30 days on this
-        machine and sent nowhere.
+        machine and sent nowhere. Commands are stored as a program name and at most one subcommand,
+        never the arguments.
       </p>
     </div>
   );
