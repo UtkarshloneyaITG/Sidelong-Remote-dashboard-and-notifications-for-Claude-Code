@@ -1,10 +1,17 @@
 # Trademark and branding
 
+**In one paragraph:**
+
+> Sidelong™ and the Sidelong logo are trademarks of the project owner. The source
+> code may be used, modified, and redistributed according to the project's
+> [software licence](LICENSE). However, redistribution or modified versions must
+> not use the Sidelong name, logo, or other branding in a way that suggests they
+> are the official Sidelong project.
+
+The rest of this file is that same rule, spelled out.
+
 The **code** in this repository is covered by [`LICENSE`](LICENSE). This file
 covers something the licence deliberately does not: the **name and the mark**.
-
-> **Sidelong**, the Sidelong logo, and the project's visual identity are not
-> licensed for reuse.
 
 Copyright licences and trademarks protect different things, and mixing them up
 is the usual mistake. A copyright licence governs *copying the software*. A
