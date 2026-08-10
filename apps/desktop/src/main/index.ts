@@ -167,6 +167,35 @@ const acknowledged: Record<string, string> = {};
 interface Hold { settle: (d: Decision) => void; expiresAt: number }
 const holds = new Map<string, Hold>();
 
+/**
+ * Drop any held prompt the session has already moved past.
+ *
+ * Approving in VS Code fires NO hook -- measured, and it is the central
+ * limitation this whole app works around. So there is nothing to listen for that
+ * says "approved". What there IS: the tool then RUNS, and `PostToolUse` (or a
+ * failure, or a denial, or a Stop) arrives and the reducer clears
+ * `pendingPermission`. That clearing is the evidence.
+ *
+ * Without this, answering in VS Code left Allow/Deny on the bar counting down
+ * for the rest of the decision window -- up to fifteen seconds of buttons
+ * offering to decide something already decided. `res.on('close')` does not cover
+ * it, because Claude Code holds the connection open even after its own prompt is
+ * answered; the request is not abandoned, it is simply no longer interesting.
+ *
+ * Settles with `null` -- "no decision" -- which is the correct answer to a
+ * question nobody is asking any more.
+ */
+function releaseSettledHolds(): void {
+  if (!holds.size) return;
+  const sessions = claude.getState().sessions;
+  for (const [id, hold] of [...holds]) {
+    const session = sessions[id];
+    if (session?.pendingPermission) continue;
+    holds.delete(id);
+    hold.settle(null);
+  }
+}
+
 /** Resolve a held prompt. Idempotent: settle() itself ignores a second call. */
 function decide(sessionId: string, behavior: 'allow' | 'deny' | 'defer'): boolean {
   const hold = holds.get(sessionId);
@@ -601,6 +630,9 @@ async function startServers(): Promise<void> {
       if (env.event.hook_event_name === 'PreToolUse') bump('tools');
       else if (env.event.hook_event_name === 'Stop') bump('turns');
       else if (env.event.hook_event_name === 'SessionStart') bump('sessions');
+      // Before pushing: if this event cleared a prompt we were holding, the
+      // decision was made somewhere we cannot see. Let the buttons go now.
+      releaseSettledHolds();
       const gone = prunable(claude.getState(), Date.now(), SESSION_TTL_MS);
       for (const id of gone) {
         delete acknowledged[id];
