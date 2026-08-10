@@ -1,6 +1,6 @@
 {
   "name": "@agent-watcher/agent-adapters",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "type": "module",
   "description": "AgentAdapter interface plus the Claude Code adapter. Claude Code only — one implementation, and no other agent is supported.",
