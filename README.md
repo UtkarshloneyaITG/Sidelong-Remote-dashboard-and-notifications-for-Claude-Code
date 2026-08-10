@@ -279,9 +279,10 @@ a reliable `[Open VS Code]` target, git branch and diagnostics.
 ### The bar
 
 The resting state. It **never resizes itself** as commands come and go — but you can
-resize it: drag the **left edge** of the capsule to widen it (width only; a taller capsule
+resize it: drag **either edge** of the capsule to widen it (width only; a taller capsule
 is just a broken capsule), and the **bottom-right corner** of the expanded card for both
-axes. Your size is remembered per mode.
+axes. The edge you did not grab holds still, so the capsule grows outward instead of
+sliding across the screen. Your size is remembered per mode.
 
 > [!NOTE]
 > The grips are drawn in the page, not by Windows. A **transparent** frameless window gets

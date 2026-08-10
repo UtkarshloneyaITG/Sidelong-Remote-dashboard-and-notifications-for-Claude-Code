@@ -79,7 +79,10 @@ const clamp = (v: number, lo: number, hi: number): number =>
  * The card takes both axes and grows down-right from its top-left, which is what
  * a bottom-right corner grip should do.
  */
-function resizeTo(width: number, height: number): void {
+/** The screen edge that must not move, captured once when the drag started. */
+type Anchor = { side: 'left' | 'right'; x: number };
+
+function resizeTo(width: number, height: number, anchor?: Anchor): void {
   if (!win) return;
   if (loadConfig().expanded) {
     const w = clamp(width, EXPANDED_MIN.width, EXPANDED_MAX.width);
@@ -89,11 +92,17 @@ function resizeTo(width: number, height: number): void {
     return;
   }
   const w = clamp(width, BAR_MIN_WIDTH, BAR_MAX_WIDTH);
-  const before = win.getBounds();
-  const rightEdge = before.x + before.width;
-  win.setContentSize(w, BAR_HEIGHT);
-  const after = win.getBounds();
-  win.setPosition(rightEdge - after.width, before.y);
+  const b = win.getBounds();
+  // One setBounds, not setContentSize followed by setPosition: a drag calls this
+  // dozens of times, and the rounding between two separate calls accumulates into
+  // visible drift. The window is frameless, so bounds and content size are the
+  // same rectangle.
+  //
+  // The anchor is the coordinate the RENDERER read once at pointerdown, not one
+  // derived from the current bounds -- re-deriving it every move feeds each
+  // frame's rounding into the next and the "fixed" edge crawls across the screen.
+  const x = anchor ? (anchor.side === 'right' ? anchor.x - w : anchor.x) : b.x;
+  win.setBounds({ x, y: b.y, width: w, height: BAR_HEIGHT });
   updateConfig({ barWidth: w });
 }
 /** Recompute elapsed/staleness. Cannot change a status -- buildView never does. */
@@ -585,10 +594,16 @@ function registerIpc(): void {
    * Limits are enforced here rather than by the window, because a transparent
    * window has no OS resize border to enforce them.
    */
-  ipcMain.handle('ui:resize', (_e, width: unknown, height: unknown) => {
+  ipcMain.handle('ui:resize', (_e, width: unknown, height: unknown, anchor: unknown) => {
     if (typeof width !== 'number' || typeof height !== 'number') return;
     if (!Number.isFinite(width) || !Number.isFinite(height)) return;
-    resizeTo(width, height);
+    const a = anchor as Partial<Anchor> | undefined;
+    const valid =
+      a != null &&
+      (a.side === 'left' || a.side === 'right') &&
+      typeof a.x === 'number' &&
+      Number.isFinite(a.x);
+    resizeTo(width, height, valid ? (a as Anchor) : undefined);
   });
 
   /**

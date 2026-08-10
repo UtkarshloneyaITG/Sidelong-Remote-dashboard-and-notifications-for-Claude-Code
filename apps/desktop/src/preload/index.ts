@@ -38,9 +38,15 @@ const api = {
   decide: (sessionId: string, behavior: 'allow' | 'deny' | 'defer'): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('ui:decide', sessionId, behavior),
   quit: (): Promise<void> => ipcRenderer.invoke('ui:quit'),
-  /** Resize from a grip. Geometry only; clamped per mode in main. */
-  resize: (width: number, height: number): Promise<void> =>
-    ipcRenderer.invoke('ui:resize', width, height),
+  /**
+   * Resize from a grip. Geometry only; clamped per mode in main. `anchor` is the
+   * screen edge that must hold still, read once when the drag began.
+   */
+  resize: (
+    width: number,
+    height: number,
+    anchor?: { side: 'left' | 'right'; x: number },
+  ): Promise<void> => ipcRenderer.invoke('ui:resize', width, height, anchor),
   hooks: {
     status: (): Promise<unknown> => ipcRenderer.invoke('hooks:status'),
     install: (scope: 'user' | 'project'): Promise<unknown> => ipcRenderer.invoke('hooks:install', scope),

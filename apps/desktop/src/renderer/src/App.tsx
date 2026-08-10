@@ -22,7 +22,11 @@ declare global {
       openEditor(sessionId?: string): Promise<{ via: string }>;
       acknowledge(sessionId: string, key: string): Promise<void>;
       decide(sessionId: string, behavior: 'allow' | 'deny' | 'defer'): Promise<{ ok: boolean }>;
-      resize(width: number, height: number): Promise<void>;
+      resize(
+        width: number,
+        height: number,
+        anchor?: { side: 'left' | 'right'; x: number },
+      ): Promise<void>;
       quit(): Promise<void>;
       hooks: {
         status(): Promise<HookStatusPayload>;
@@ -94,28 +98,48 @@ function useElapsed(session: SessionView | undefined): number {
  * `screenX/Y` rather than `clientX/Y`: the window is moving underneath the
  * pointer as it resizes, so window-relative coordinates feed back on themselves.
  */
-function useGrip(axis: 'x' | 'xy'): (e: React.PointerEvent) => void {
-  return useCallback((e: React.PointerEvent) => {
+function useGrip(edge: 'left' | 'right' | 'corner'): (e: React.PointerEvent<HTMLElement>) => void {
+  return useCallback((e: React.PointerEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.screenX;
     const startY = e.screenY;
     const startW = window.innerWidth;
     const startH = window.innerHeight;
+    // Without capture the drag dies the instant the cursor crosses the window
+    // edge -- which is immediately, because a grip sits ON that edge and you
+    // drag outward from it. Capture keeps the events coming to this element.
+    const grip = e.currentTarget;
+    const pointerId = e.pointerId;
+    grip.setPointerCapture(pointerId);
+    // Dragging an edge outward widens: the OPPOSITE edge stays put, which is
+    // what makes a grip feel like a grip rather than a move handle. Read that
+    // edge ONCE -- re-reading it while the window is moving chases itself.
+    const anchor =
+      edge === 'left'
+        ? ({ side: 'right', x: window.screenX + startW } as const)
+        : ({ side: 'left', x: window.screenX } as const);
 
     const move = (ev: PointerEvent): void => {
-      // The capsule is anchored at its right edge, so dragging LEFT widens it.
-      const width = startW + (startX - ev.screenX) * (axis === 'x' ? 1 : -1);
-      const height = axis === 'xy' ? startH + (ev.screenY - startY) : startH;
-      void window.watcher.resize(Math.round(width), Math.round(height));
+      const dx = edge === 'left' ? startX - ev.screenX : ev.screenX - startX;
+      const width = startW + dx;
+      const height = edge === 'corner' ? startH + (ev.screenY - startY) : startH;
+      void window.watcher.resize(
+        Math.round(width),
+        Math.round(height),
+        edge === 'corner' ? undefined : anchor,
+      );
     };
     const up = (): void => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
+      grip.releasePointerCapture(pointerId);
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', up);
     };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }, [axis]);
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
+  }, [edge]);
 }
 
 function Dot({ severity, pulse }: { severity: Severity; pulse?: boolean }): JSX.Element {
@@ -333,7 +357,8 @@ function Setup({ onClose }: { onClose: () => void }): JSX.Element {
  */
 function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }): JSX.Element {
   const [hint, open] = useOpenEditor();
-  const grip = useGrip('x');
+  const gripLeft = useGrip('left');
+  const gripRight = useGrip('right');
   const a = view.active;
   const severity: Severity = a?.severity ?? 'offline';
   // While we can actually ANSWER the prompt, Allow/Deny replaces the
@@ -357,15 +382,23 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
         pending ? 'border-amber-500/60' : 'border-zinc-700/80'
       }`}
     >
-      {/* Width-only grip on the left edge: the capsule is anchored top-right, so
-          it grows leftwards into free screen rather than off the edge. */}
+      {/* Width-only grips on BOTH edges -- reaching for either one is the
+          instinct, and a grip you have to guess the side of is not a grip.
+          Each anchors the opposite edge, so the capsule grows away from the
+          side you grabbed instead of sliding across the screen. */}
       <span
-        onPointerDown={grip}
+        onPointerDown={gripLeft}
         title="Drag to resize"
         className="absolute inset-y-0 left-0 z-20 w-3 cursor-ew-resize"
         // Inline, not just the .no-drag class: window dragging is resolved in the
         // compositor before JS runs, so if this region is draggable the pointer
         // moves the window and the grip never sees the event.
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      />
+      <span
+        onPointerDown={gripRight}
+        title="Drag to resize"
+        className="absolute inset-y-0 right-0 z-20 w-3 cursor-ew-resize"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       />
 
@@ -539,7 +572,7 @@ export default function App(): JSX.Element {
   const [view, setView] = useState<RendererView | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [openHint, openEditor] = useOpenEditor();
-  const cornerGrip = useGrip('xy');
+  const cornerGrip = useGrip('corner');
 
   useEffect(() => {
     void window.watcher.getView().then(setView);

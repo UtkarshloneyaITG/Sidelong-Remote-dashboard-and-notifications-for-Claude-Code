@@ -9,6 +9,36 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Resize grips, per mode.** The capsule takes a width-only grip on **both**
+  edges; the expanded card takes a both-axis grip in its bottom-right corner.
+  Limits live in the main process (bar 360–1600 wide at a fixed 56 tall; card
+  300×240 to 1200×1200) and each mode remembers its own size.
+
+  Drawn in the page rather than by the OS, because a **transparent** frameless
+  window gets no resize border — measured: `WS_THICKFRAME` is absent whatever
+  `resizable` is set to. Native drag-resize and rounded corners cannot coexist.
+
+### Fixed
+
+- **A grip drag died the moment the pointer left the window.** The listeners sat
+  on `window`, and a grip is *on* the edge you drag away from — so the first
+  move outside the frame stopped delivering events and the resize silently did
+  nothing. Root cause was the missing `setPointerCapture`, not the grip
+  geometry.
+- **The "fixed" edge crawled across the screen during a drag.** Each move
+  re-derived the anchor from live bounds, feeding every frame's rounding into
+  the next: measured **29 px** of drift on one diagonal drag. The renderer now
+  reads that edge once at pointerdown and sends it, and main applies size and
+  position in a single `setBounds` instead of `setContentSize` then
+  `setPosition`. Re-measured: the anchored edge holds to **0 px** across left,
+  right, outward, inward and clamped drags.
+
+---
+
 ## [0.1.5] — 2026-08-08
 
 ### Added
