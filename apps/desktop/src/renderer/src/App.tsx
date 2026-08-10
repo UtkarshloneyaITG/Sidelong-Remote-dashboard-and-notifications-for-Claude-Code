@@ -28,6 +28,7 @@ declare global {
         anchor?: { side: 'left' | 'right'; x: number },
       ): Promise<void>;
       quit(): Promise<void>;
+      stats(): Promise<StatsPayload>;
       hooks: {
         status(): Promise<HookStatusPayload>;
         install(scope: 'user' | 'project'): Promise<unknown>;
@@ -35,6 +36,22 @@ declare global {
       };
     };
   }
+}
+
+interface DayCounts {
+  prompts: number;
+  answered: number;
+  answeredMs: number;
+  elsewhere: number;
+  elsewhereMs: number;
+  tools: number;
+  turns: number;
+  sessions: number;
+}
+
+interface StatsPayload {
+  /** Oldest first, one row per local day, gaps filled with real zeroes. */
+  days: { date: string; blockedMs: number; counts: DayCounts }[];
 }
 
 interface HookStatusPayload {
@@ -401,6 +418,171 @@ function FilesChanged({ session }: { session: SessionView }): JSX.Element | null
   );
 }
 
+const RANGES = [
+  { label: '7d', days: 7 },
+  { label: '14d', days: 14 },
+  { label: '30d', days: 30 },
+] as const;
+
+/** Compact duration for axis labels and totals: 0s, 45s, 6m, 2h 10m. */
+function dur(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+/**
+ * What the overlay bought you, from your own two populations of prompts.
+ *
+ * Every prompt ends up in exactly one of them: answered from the bar, or
+ * resolved somewhere we cannot see (VS Code, the terminal). Both carry the wait
+ * from the prompt arriving to it being settled, so the difference of the means
+ * is the per-prompt saving -- measured against your own habits, not a number
+ * someone picked.
+ *
+ * It returns null rather than a small number when either population is thin. A
+ * "saving" computed from one sample of each is noise wearing a decimal point.
+ */
+const MIN_SAMPLES = 3;
+function savings(rows: DayCounts[]): { perPrompt: number; total: number; answered: number; elsewhere: number } | null {
+  const t = rows.reduce(
+    (acc, c) => ({
+      answered: acc.answered + c.answered,
+      answeredMs: acc.answeredMs + c.answeredMs,
+      elsewhere: acc.elsewhere + c.elsewhere,
+      elsewhereMs: acc.elsewhereMs + c.elsewhereMs,
+    }),
+    { answered: 0, answeredMs: 0, elsewhere: 0, elsewhereMs: 0 },
+  );
+  if (t.answered < MIN_SAMPLES || t.elsewhere < MIN_SAMPLES) return null;
+  const perPrompt = t.elsewhereMs / t.elsewhere - t.answeredMs / t.answered;
+  if (perPrompt <= 0) return null;
+  return { perPrompt, total: perPrompt * t.answered, answered: t.answered, elsewhere: t.elsewhere };
+}
+
+function Analysis({ onClose }: { onClose: () => void }): JSX.Element {
+  const [stats, setStats] = useState<StatsPayload | null>(null);
+  const [range, setRange] = useState<number>(7);
+
+  useEffect(() => {
+    void window.watcher.stats().then(setStats);
+  }, []);
+
+  const days = (stats?.days ?? []).slice(-range);
+  const counts = days.map((d) => d.counts);
+  const peak = Math.max(1, ...days.map((d) => d.blockedMs));
+  const total = counts.reduce(
+    (acc, c) => ({
+      prompts: acc.prompts + c.prompts,
+      tools: acc.tools + c.tools,
+      turns: acc.turns + c.turns,
+      sessions: acc.sessions + c.sessions,
+    }),
+    { prompts: 0, tools: 0, turns: 0, sessions: 0 },
+  );
+  const blocked = days.reduce((a, d) => a + d.blockedMs, 0);
+  const saved = savings(counts);
+
+  return (
+    // A scrolling BLOCK, not a flex column. In a flex column every child is
+    // shrinkable by default, so making the card shorter squeezed the chart down
+    // to a row of dashes and eventually to nothing -- the panel gave away the
+    // one thing it exists to show in order to keep the numbers below it on
+    // screen. Block layout gives each child its natural height and scrolls.
+    <div className="absolute inset-0 z-10 overflow-y-auto bg-zinc-950 p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium text-zinc-200">Analysis</span>
+        <button type="button" className="no-drag text-[11px] text-zinc-500 hover:text-zinc-200" onClick={onClose}>
+          close
+        </button>
+      </div>
+
+      <div className="mt-2 flex gap-1">
+        {RANGES.map((r) => (
+          <button
+            key={r.label}
+            type="button"
+            onClick={() => setRange(r.days)}
+            className={`no-drag rounded px-2 py-0.5 text-[10px] ${
+              range === r.days ? 'bg-zinc-100 text-zinc-900' : 'border border-zinc-800 text-zinc-400 hover:text-zinc-100'
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Waiting per day. One bar per day including the empty ones -- dropping a
+          quiet day would silently rescale the axis and make a quiet week look
+          exactly like a busy one. */}
+      <div className="mt-3 text-[10px] uppercase tracking-wider text-zinc-600">Claude waiting on you</div>
+      {/* shrink-0 as well as block layout above: whatever this ends up nested
+          in, the chart keeps its 96px. It is the point of the panel. */}
+      <div className="mt-1.5 flex h-24 shrink-0 items-end gap-[2px]">
+        {days.map((d) => (
+          <div
+            key={d.date}
+            title={`${d.date} — ${dur(d.blockedMs)}`}
+            className="flex-1 rounded-sm bg-amber-400/70 transition-[height] duration-300 hover:bg-amber-300"
+            style={{ height: `${Math.max(d.blockedMs > 0 ? 3 : 1, (d.blockedMs / peak) * 100)}%` }}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between font-mono text-[9px] text-zinc-600">
+        <span>{days[0]?.date.slice(5)}</span>
+        <span>peak {dur(peak)}</span>
+        <span>{days[days.length - 1]?.date.slice(5)}</span>
+      </div>
+
+      <div className="mt-3 rounded border border-zinc-800 p-2">
+        <div className="text-[10px] uppercase tracking-wider text-zinc-600">Time saved</div>
+        {saved ? (
+          <>
+            <div className="mt-0.5 font-mono text-[15px] tabular-nums text-emerald-400">{dur(saved.total)}</div>
+            <p className="mt-1 text-[9.5px] leading-relaxed text-zinc-500">
+              {dur(saved.perPrompt)} per prompt × {saved.answered} answered here, against your own{' '}
+              {saved.elsewhere} settled in VS Code instead.
+            </p>
+            <p className="mt-1.5 text-[9px] leading-relaxed text-zinc-600">
+              An estimate, not a measurement: the two groups are self-selected, not assigned, and a
+              grant in VS Code fires no hook, so its wait is read from the tool starting — tens of
+              ms late, which flatters this figure.
+            </p>
+          </>
+        ) : (
+          <p className="mt-1 text-[9.5px] leading-relaxed text-zinc-500">
+            Needs at least {MIN_SAMPLES} prompts answered here and {MIN_SAMPLES} settled in VS Code
+            in this range — so it needs Allow/Deny turned on. Until both groups exist there is
+            nothing to compare, and a figure from one of each would be noise. Nothing is estimated
+            in the meantime.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {[
+          ['Waiting on you', dur(blocked)],
+          ['Prompts', String(total.prompts)],
+          ['Tool calls', String(total.tools)],
+          ['Turns', String(total.turns)],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded border border-zinc-800 p-2">
+            <div className="text-[9.5px] uppercase tracking-wider text-zinc-600">{label}</div>
+            <div className="mt-0.5 font-mono text-[13px] tabular-nums text-zinc-200">{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 text-[9.5px] leading-relaxed text-zinc-600">
+        Every figure here is a tally of hook events that actually arrived, kept for 30 days on this
+        machine and sent nowhere.
+      </p>
+    </div>
+  );
+}
+
 function Setup({ onClose }: { onClose: () => void }): JSX.Element {
   const [status, setStatus] = useState<HookStatusPayload | null>(null);
   const refresh = useCallback(() => {
@@ -670,7 +852,10 @@ function ConnectionRow({ view, onFix }: { view: RendererView; onFix: () => void 
   const bridgeDot = bridge === 'connected' ? 'bg-emerald-400'
     : bridge === 'reconnecting' ? 'bg-amber-400' : 'bg-zinc-600';
   return (
-    <div className="mt-auto border-t border-zinc-800/80 px-2.5 py-1.5 text-[10px] text-zinc-500">
+    // No `mt-auto` here: the action row above it already claims the free space.
+    // With both set, flex splits the gap between them and the buttons end up
+    // stranded in the middle of the card instead of against the footer.
+    <div className="border-t border-zinc-800/80 px-2.5 py-1.5 text-[10px] text-zinc-500">
       {/* Drift is the one condition here that makes everything BELOW it
           untrustworthy: the hooks Claude Code has installed no longer match the
           ones this app expects, so the overlay can go quietly out of date.
@@ -711,6 +896,7 @@ function ConnectionRow({ view, onFix }: { view: RendererView; onFix: () => void 
 export default function App(): JSX.Element {
   const [view, setView] = useState<RendererView | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const [openHint, openEditor] = useOpenEditor();
   const cornerGrip = useGrip('corner');
 
@@ -810,33 +996,6 @@ export default function App(): JSX.Element {
             </div>
           )}
 
-          <div className="mt-3 flex items-center gap-2 px-2.5">
-            <button
-              type="button"
-              className="no-drag rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100"
-              onClick={() => openEditor(active?.sessionId)}
-            >
-              Open VS Code
-            </button>
-            <button
-              type="button"
-              className="no-drag rounded border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-200"
-              onClick={() => setSetupOpen(true)}
-            >
-              Hooks
-            </button>
-            {openHint && (
-              <span className="truncate text-[9.5px] text-amber-300">{openHint}</span>
-            )}
-            <button
-              type="button"
-              className="no-drag ml-auto text-[10px] text-zinc-700 hover:text-zinc-400"
-              onClick={() => void window.watcher.quit()}
-            >
-              Quit
-            </button>
-          </div>
-
         {/* The one number nothing else can compute: how long Claude actually
             waited on you today. Only shown once there is something to report. */}
         {(view.blockedTodayMs ?? 0) >= 1000 && (
@@ -850,8 +1009,46 @@ export default function App(): JSX.Element {
           </div>
         )}
 
+        {/* Actions sit at the BOTTOM, against the status footer. Up under the
+            summary they split the card in two and left the timeline floating in
+            the middle of a page of empty space -- and controls belong at the
+            edge you reach for, not in the middle of what you are reading.
+            `mt-auto` puts them there however tall the card is dragged. */}
+        <div className="mt-auto flex items-center gap-2 px-2.5 pb-1.5 pt-3">
+          <button
+            type="button"
+            className="no-drag rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100"
+            onClick={() => openEditor(active?.sessionId)}
+          >
+            Open VS Code
+          </button>
+          <button
+            type="button"
+            className="no-drag rounded border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-200"
+            onClick={() => setSetupOpen(true)}
+          >
+            Hooks
+          </button>
+          <button
+            type="button"
+            className="no-drag rounded border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-200"
+            onClick={() => setAnalysisOpen(true)}
+          >
+            Analysis
+          </button>
+          {openHint && <span className="truncate text-[9.5px] text-amber-300">{openHint}</span>}
+          <button
+            type="button"
+            className="no-drag ml-auto text-[10px] text-zinc-700 hover:text-zinc-400"
+            onClick={() => void window.watcher.quit()}
+          >
+            Quit
+          </button>
+        </div>
+
         <ConnectionRow view={view} onFix={() => setSetupOpen(true)} />
         {setupOpen && <Setup onClose={() => setSetupOpen(false)} />}
+        {analysisOpen && <Analysis onClose={() => setAnalysisOpen(false)} />}
       </div>
 
       {/* Both-axis grip in the bottom-right corner, where one belongs. */}

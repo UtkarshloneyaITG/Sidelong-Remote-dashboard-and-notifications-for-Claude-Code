@@ -146,8 +146,15 @@ function decide(sessionId: string, behavior: 'allow' | 'deny' | 'defer'): boolea
   // until PostToolUse lands, so the acknowledge pair would pop up the instant
   // Allow was clicked -- offering to remind you about something you just decided.
   if (behavior !== 'defer') {
-    const key = currentView().sessions.find((s) => s.sessionId === sessionId)?.permissionKey;
-    if (key) acknowledged[sessionId] = key;
+    const s = currentView().sessions.find((x) => x.sessionId === sessionId);
+    if (s?.permissionKey) {
+      acknowledged[sessionId] = s.permissionKey;
+      // Stamp the wait NOW, at the click. This is the sample that gets compared
+      // against the ones resolved in VS Code; the tally itself happens when the
+      // prompt clears, so a prompt cannot be counted in both populations.
+      const id = promptId(sessionId, s.permissionKey);
+      if (s.pendingPermission) answeredInBar.set(id, Math.max(0, Date.now() - s.pendingPermission.at));
+    }
   }
   pushView();
   return true;
@@ -167,17 +174,132 @@ let blockedByDay: Record<string, number> = {};
 const lastBlockedSeen = new Map<string, number>();
 let statsDirty = false;
 
+/**
+ * Per-day counts, alongside the blocked total.
+ *
+ * Every one of these is a tally of something that actually arrived. There is
+ * deliberately no "time saved" figure: that would be a counterfactual -- what
+ * your day would have looked like without the overlay -- and this app does not
+ * invent numbers it cannot observe. `answered` is the closest honest thing to
+ * it, being an exact count of prompts you settled from the bar and therefore did
+ * not switch windows for.
+ */
+export interface DayCounts {
+  /** Permission prompts that survived the grace period and were shown to you. */
+  prompts: number;
+  /** Of those, ones you answered from the bar with Allow or Deny. */
+  answered: number;
+  /** Total wait across those, measured to the instant you clicked. */
+  answeredMs: number;
+  /** Prompts that cleared without you touching the bar -- answered in VS Code. */
+  elsewhere: number;
+  /** Total wait across those. */
+  elsewhereMs: number;
+  /** Tool calls started. */
+  tools: number;
+  /** Turns that ended. */
+  turns: number;
+  /** Sessions started. */
+  sessions: number;
+}
+
+const ZERO_COUNTS: DayCounts = {
+  prompts: 0, answered: 0, answeredMs: 0, elsewhere: 0, elsewhereMs: 0,
+  tools: 0, turns: 0, sessions: 0,
+};
+let countsByDay: Record<string, DayCounts> = {};
+
+function bump(field: keyof DayCounts, by = 1): void {
+  const day = dayKey();
+  const row = countsByDay[day] ?? { ...ZERO_COUNTS };
+  row[field] += by;
+  countsByDay[day] = row;
+  statsDirty = true;
+}
+
+/**
+ * Count a prompt once, using the SAME gate the bar uses to show one.
+ *
+ * Counting raw `PermissionRequest` events would inflate this with prompts that
+ * were auto-approved milliseconds later and never reached you -- the exact
+ * flicker `permissionActionable` exists to suppress. A number that disagrees
+ * with what you saw is worse than no number.
+ */
+const openPrompts = new Map<string, number>(); // id -> when it arrived
+const answeredInBar = new Map<string, number>(); // id -> wait at the moment of the click
+
+const promptId = (sessionId: string, key: string): string => `${sessionId}:${key}`;
+
+function accruePrompts(view: {
+  now: number;
+  sessions: {
+    sessionId: string;
+    permissionActionable?: boolean;
+    permissionKey?: string;
+    pendingPermission?: { at: number };
+  }[];
+}): void {
+  const live = new Set<string>();
+  for (const s of view.sessions) {
+    if (!s.pendingPermission || !s.permissionKey) continue;
+    const id = promptId(s.sessionId, s.permissionKey);
+    live.add(id);
+    if (!openPrompts.has(id) && s.permissionActionable) {
+      openPrompts.set(id, s.pendingPermission.at);
+      bump('prompts');
+    }
+  }
+
+  // A prompt that is no longer pending got resolved. HOW it was resolved is the
+  // measurement: from the bar, or somewhere we cannot see.
+  for (const [id, at] of openPrompts) {
+    if (live.has(id)) continue;
+    const clicked = answeredInBar.get(id);
+    if (clicked === undefined) {
+      // Nobody touched the bar, so this was granted in VS Code or the terminal.
+      // Permission grants fire no hook -- measured -- so the first evidence is
+      // the tool RUNNING, a few tens of ms after the human actually clicked.
+      // That overstates this population's wait, which flatters the bar: the
+      // saving is computed as (this mean - the bar's mean). Tens of ms against
+      // waits measured in seconds, but the direction is stated in the panel
+      // rather than left for someone to work out.
+      bump('elsewhere');
+      bump('elsewhereMs', Math.max(0, view.now - at));
+    } else {
+      bump('answered');
+      bump('answeredMs', clicked);
+    }
+    openPrompts.delete(id);
+    answeredInBar.delete(id);
+  }
+}
+
 const statsFile = (): string => join(app.getPath('userData'), 'stats.json');
 const dayKey = (d = new Date()): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+/**
+ * Reads both shapes. Before counts existed the file WAS the blocked map, and an
+ * upgrade must not throw away the days someone has already banked.
+ */
 function loadStats(): void {
   try {
     const raw: unknown = JSON.parse(readFileSync(statsFile(), 'utf8'));
-    if (raw && typeof raw === 'object') {
+    if (!raw || typeof raw !== 'object') return;
+    const obj = raw as Record<string, unknown>;
+    const legacy = !('blockedByDay' in obj) && !('countsByDay' in obj);
+    const blocked = legacy ? obj : obj.blockedByDay;
+    if (blocked && typeof blocked === 'object') {
       blockedByDay = Object.fromEntries(
-        Object.entries(raw as Record<string, unknown>)
+        Object.entries(blocked as Record<string, unknown>)
           .filter(([, v]) => typeof v === 'number' && Number.isFinite(v)) as [string, number][],
+      );
+    }
+    if (obj.countsByDay && typeof obj.countsByDay === 'object') {
+      countsByDay = Object.fromEntries(
+        Object.entries(obj.countsByDay as Record<string, unknown>)
+          .filter(([, v]) => v && typeof v === 'object')
+          .map(([k, v]) => [k, { ...ZERO_COUNTS, ...(v as Partial<DayCounts>) }]),
       );
     }
   } catch {
@@ -196,8 +318,10 @@ function saveStats(): void {
   statsDirty = false;
   const keep = Object.keys(blockedByDay).sort().slice(-STATS_KEEP_DAYS);
   blockedByDay = Object.fromEntries(keep.map((k) => [k, blockedByDay[k]]));
+  const keepCounts = Object.keys(countsByDay).sort().slice(-STATS_KEEP_DAYS);
+  countsByDay = Object.fromEntries(keepCounts.map((k) => [k, countsByDay[k]]));
   try {
-    writeFileSync(statsFile(), JSON.stringify(blockedByDay), 'utf8');
+    writeFileSync(statsFile(), JSON.stringify({ blockedByDay, countsByDay }), 'utf8');
   } catch {
     /* a stat we cannot persist is not worth failing a launch over */
   }
@@ -321,6 +445,7 @@ function currentView(): OverlayView {
 
 function pushView(): void {
   const view = currentView();
+  accruePrompts(view);
   win?.webContents.send('view', { ...view, expanded: loadConfig().expanded });
   notifier?.update(view);
   refreshTray(view);
@@ -379,6 +504,12 @@ async function startServers(): Promise<void> {
       debugLog(env);
       claude.ingest(env);
       accrueBlocked(claude.getState());
+      // Tallies, from the event that actually arrived -- not from a state we
+      // inferred afterwards. `prompts` is counted from the view instead, so it
+      // matches what was put in front of you rather than what was requested.
+      if (env.event.hook_event_name === 'PreToolUse') bump('tools');
+      else if (env.event.hook_event_name === 'Stop') bump('turns');
+      else if (env.event.hook_event_name === 'SessionStart') bump('sessions');
       const gone = prunable(claude.getState(), Date.now(), SESSION_TTL_MS);
       for (const id of gone) {
         delete acknowledged[id];
@@ -594,6 +725,29 @@ function registerIpc(): void {
    * Limits are enforced here rather than by the window, because a transparent
    * window has no OS resize border to enforce them.
    */
+  /**
+   * The stats panel's data: one row per local day, oldest first, with gaps
+   * filled in as real zeroes. A day you did not use Claude Code is a zero, not
+   * a missing bar -- dropping it would quietly redraw the x axis and make a
+   * quiet week look identical to a busy one.
+   */
+  ipcMain.handle('ui:stats', () => {
+    const days: { date: string; blockedMs: number; counts: DayCounts }[] = [];
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (STATS_KEEP_DAYS - 1));
+    for (let i = 0; i < STATS_KEEP_DAYS; i += 1) {
+      const key = dayKey(d);
+      days.push({
+        date: key,
+        blockedMs: blockedByDay[key] ?? 0,
+        counts: countsByDay[key] ?? { ...ZERO_COUNTS },
+      });
+      d.setDate(d.getDate() + 1);
+    }
+    return { days };
+  });
+
   ipcMain.handle('ui:resize', (_e, width: unknown, height: unknown, anchor: unknown) => {
     if (typeof width !== 'number' || typeof height !== 'number') return;
     if (!Number.isFinite(width) || !Number.isFinite(height)) return;

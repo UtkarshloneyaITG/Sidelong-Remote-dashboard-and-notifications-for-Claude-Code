@@ -11,6 +11,50 @@ code — each entry names the root cause rather than the symptom.
 
 ## [Unreleased]
 
+### Added
+
+- **Analysis panel**, from the expanded card. A **7 / 14 / 30 day** filter, a bar per
+  day of how long Claude spent blocked on you, and totals for prompts, tool calls and
+  turns. Counted from events that arrived — `PreToolUse`, `Stop`, `SessionStart` — with
+  prompts counted through the same `permissionActionable` gate the bar uses, so the number
+  matches what you were actually shown. Kept 30 days in `stats.json`, sent nowhere. The
+  file's old flat shape is still read, so upgrading loses no banked days.
+
+- **Time saved**, and a method rather than a slogan. There is no way to observe what your
+  day would have looked like without the overlay, so the app compares two things it can
+  both measure: prompts you answered on the bar (**B**, timed to the click) against prompts
+  that were settled in VS Code instead (**V**, timed to the prompt clearing). With
+  `Δ = w̄_V − w̄_B`, the estimate is `S = Δ × n_B`.
+
+  It is withheld entirely below 3 samples in either group, and withheld if `Δ ≤ 0` — a
+  difference of means from one sample each is noise with a decimal point, and a negative
+  result means the bar was not faster, which is worth knowing and not worth dressing up.
+  Both of its biases are stated in the panel: the groups are self-selected rather than
+  assigned, and since a grant in VS Code fires no hook, **V**'s wait is read from the tool
+  starting — tens of ms late, which inflates the figure in the app's own favour.
+
+### Fixed
+
+- **A question Claude asked you was overwritten by the notice that it was asking.** When
+  `Notification[agent_needs_input]` followed a `Stop`, the bar replaced *"Should I keep the
+  old reducer as a fallback, or delete it?"* with *"Claude is waiting for your input"* —
+  swapping the only useful sentence on the bar for a label describing it. The message is
+  now carried through from the completed turn. Only from `COMPLETED`, since in any other
+  state it belongs to an older turn and stale beats dull.
+
+  What is **not** fixed, and is now written down in the ledger: a turn that ends by asking
+  you something emits `Stop` like any other, so until the idle notice arrives the session
+  reads as finished. No hook distinguishes "finished" from "finished by asking", and the
+  app will not infer one from a question mark.
+
+- **The Analysis chart collapsed as the card got shorter.** In a flex column every child is
+  shrinkable, so the panel gave away the one thing it exists to show in order to keep the
+  numbers below it on screen — down to a row of dashes, then to nothing. It is a scrolling
+  block now.
+
+- **The action row sat stranded in the middle of the card.** Both it and the status footer
+  had `mt-auto`, so flex split the free space between them.
+
 ### Changed
 
 - **The bar's status light is an arc down the capsule's left rim**, lit by a

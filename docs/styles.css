@@ -218,7 +218,8 @@ section:first-of-type { border-top: 0; }
 .frame {
   position: absolute; inset: 0;
   display: flex; align-items: center; gap: 11px;
-  padding: 0 14px;
+  /* Extra on the left so the text clears the arc, which is 7px of the rim. */
+  padding: 0 14px 0 20px;
   opacity: 0;
   animation: frameCycle 16s infinite;
 }
@@ -227,10 +228,45 @@ section:first-of-type { border-top: 0; }
 .frame:nth-child(3) { animation-delay: 8s; }
 .frame:nth-child(4) { animation-delay: 12s; }
 
-.dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-.dot--work { background: var(--emerald); box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15); }
-.dot--attn { background: var(--amber); box-shadow: 0 0 0 3px rgba(245, 181, 68, 0.2); }
-.dot--done { background: var(--sky); box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15); }
+/* The status arc, built exactly as the app builds it: the LEFT BORDER of a
+   rounded box, so it follows the rim instead of sitting on it as a straight
+   line. The colour is a gradient, which a border cannot hold -- so it is a
+   background painted over the border box and masked down to the border ring.
+   Only the left border has width, so only the left arc lights up. */
+.edge {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 0 solid transparent;
+  border-left-width: 7px;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--edge) 22%, transparent) 0%,
+      var(--edge) 30%,
+      color-mix(in oklab, white 45%, var(--edge)) 50%,
+      var(--edge) 70%,
+      color-mix(in oklab, var(--edge) 22%, transparent) 100%
+    )
+    border-box;
+  background-size: 100% 120px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: edgeFlow 2.4s linear infinite;
+}
+/* White is the end of a turn, and nothing else uses it. */
+.edge--work { --edge: #34d399; }
+.edge--attn { --edge: #fbbf24; }
+.edge--done { --edge: #ffffff; }
+
+@keyframes edgeFlow {
+  from { background-position: 0 0; }
+  to { background-position: 0 120px; }
+}
 
 .proj { color: var(--text); font-weight: 500; }
 .badge {
@@ -263,7 +299,7 @@ section:first-of-type { border-top: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .frame, .demo__frame { animation: none; }
+  .frame, .demo__frame, .edge { animation: none; }
   .frame { opacity: 0; }
   .frame:nth-child(3) { opacity: 1; }
   .demo__frame { border-color: rgba(245, 181, 68, 0.6); }

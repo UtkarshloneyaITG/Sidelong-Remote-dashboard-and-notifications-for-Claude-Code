@@ -56,6 +56,7 @@
   <a href="#download">Download</a>
   <a href="#states">States</a>
   <a href="#how">How it works</a>
+  <a href="#analysis">Analysis</a>
   <a href="install.html">Install</a>
   <a href="capabilities.html">Capabilities</a>
   <a href="https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar">GitHub&nbsp;↗</a>
@@ -73,20 +74,20 @@
   <div class="demo">
     <div class="demo__frame" role="img" aria-label="The Sidelong bar cycling through four states: thinking, reading a file, waiting on a permission prompt for npm install, and finished.">
       <div class="frame">
-        <span class="dot dot--work"></span><span class="proj">demo</span>
+        <span class="edge edge--work"></span><span class="proj">demo</span>
         <span class="plain">Thinking…</span><span class="time">00:14</span>
       </div>
       <div class="frame">
-        <span class="dot dot--work"></span><span class="proj">demo</span>
+        <span class="edge edge--work"></span><span class="proj">demo</span>
         <span class="chip">Reading src/app.ts</span><span class="time">00:22</span>
       </div>
       <div class="frame">
-        <span class="dot dot--attn"></span><span class="proj">demo</span><span class="badge">+1</span>
+        <span class="edge edge--attn"></span><span class="proj">demo</span><span class="badge">+1</span>
         <span class="chip chip--attn">Run `npm install`?</span>
         <span class="mini">Open VS Code</span><span class="mini">ok</span>
       </div>
       <div class="frame">
-        <span class="dot dot--done"></span><span class="proj">demo</span>
+        <span class="edge edge--done"></span><span class="proj">demo</span>
         <span class="plain">Added a /health endpoint and a test for it.</span><span class="time">01:47</span>
       </div>
     </div>
@@ -198,25 +199,25 @@
 
   <div class="shots">
     <figure class="shot--bar">
-      <img src="assets/bar-thinking.png" width="706" height="74" loading="lazy"
+      <img src="assets/bar-thinking.png" width="706" height="76" loading="lazy"
            alt="Sidelong bar showing a green dot, project name demo, and the text Thinking… with a 00:02 timer.">
       <figcaption>Thinking — the turn is open and no tool is running. No hook fires during inference, so this is the honest name for a gap we can bound but not see into.</figcaption>
     </figure>
 
     <figure class="shot--bar">
-      <img src="assets/bar-working.png" width="706" height="74" loading="lazy"
+      <img src="assets/bar-working.png" width="706" height="76" loading="lazy"
            alt="Sidelong bar showing a green dot and the command Running npm run build in a monospace chip.">
       <figcaption>Auto-running — Claude is executing without asking, so the bar tracks the command and shows no buttons. There is nothing for you to decide.</figcaption>
     </figure>
 
     <figure class="shot--bar">
-      <img src="assets/bar-permission.png" width="706" height="74" loading="lazy"
+      <img src="assets/bar-permission.png" width="706" height="76" loading="lazy"
            alt="Sidelong bar with an amber border and dot, showing Run npm install? next to Open VS Code and ok buttons.">
       <figcaption>Blocked — amber, with the <em>actual</em> command from the tool input. The buttons fade in over the command rather than resizing the window.</figcaption>
     </figure>
 
     <figure class="shot--bar">
-      <img src="assets/bar-decision.png" width="704" height="74" loading="lazy"
+      <img src="assets/bar-decision.png" width="706" height="76" loading="lazy"
            alt="Sidelong bar showing Run npm install? with a 13 second countdown and green Allow and red Deny buttons.">
       <figcaption>Answering it — <strong>opt-in, off by default</strong>. The countdown is how
       long until the hold lapses and VS Code prompts you instead; nothing is lost when it runs
@@ -227,7 +228,7 @@
 
   <div class="shots shots--split" style="margin-top:34px">
     <figure>
-      <img src="assets/expanded.png" width="441" height="538" loading="lazy"
+      <img src="assets/expanded.png" width="440" height="540" loading="lazy"
            alt="Sidelong expanded card showing a completion summary, an activity timeline with a failed npm test, two changed files, and connection status.">
       <figcaption>The expanded card</figcaption>
     </figure>
@@ -300,8 +301,109 @@
   </div>
 </section>
 
+<section id="analysis">
+  <p class="eyebrow">05 — Analysis</p>
+  <h2>What it actually <em>bought</em> you.</h2>
+  <p>
+    <code>Analysis</code> in the expanded card opens a panel with a <strong>7 / 14 / 30 day</strong>
+    filter, a bar per day of how long Claude spent blocked on you, totals for prompts, tool calls
+    and turns — and one estimate: <strong>time saved</strong>. Everything is a tally of hook events
+    that actually arrived, kept 30 days on your machine and sent nowhere.
+  </p>
+
+  <div class="shots shots--split" style="margin-top:34px">
+    <figure>
+      <img src="assets/analysis.png" width="440" height="540" loading="lazy"
+           alt="Sidelong's Analysis panel: a 7-day bar chart of time Claude spent waiting, a time-saved figure of 6 minutes with its derivation, and totals for waiting and prompts.">
+      <figcaption>The Analysis panel — figures from a demo session</figcaption>
+    </figure>
+    <div>
+      <h3>Two groups, one subtraction</h3>
+      <p>
+        There is no way to observe what your day <em>would</em> have looked like without the
+        overlay, so the app doesn't guess at one. It compares two things it can both measure:
+        your own prompts, split by how they were resolved.
+      </p>
+      <p>
+        A prompt <em>i</em> arrives at <code>aᵢ</code> and resolves at <code>rᵢ</code>, so its wait
+        is <code>wᵢ = rᵢ − aᵢ</code>. It only enters the data once it has outlived the
+        <strong>700 ms grace window</strong> — below that it was auto-approved and never reached
+        you.
+      </p>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Group</th><th>How it was resolved</th><th>How <code>rᵢ</code> is known</th></tr></thead>
+    <tbody>
+      <tr><td><strong>B</strong></td><td>You clicked Allow or Deny on the bar</td><td>The instant of the click — exact</td></tr>
+      <tr><td><strong>V</strong></td><td>You answered in VS Code or the terminal</td><td>When the prompt cleared, i.e. the tool started</td></tr>
+    </tbody>
+  </table>
+
+<pre><code>w̄_B = Σw_B / n_B     <span class="c"># mean wait when you answered here</span>
+w̄_V = Σw_V / n_V     <span class="c"># mean wait when you answered in VS Code</span>
+
+Δ   = w̄_V − w̄_B      <span class="c"># saving per prompt</span>
+S   = Δ × n_B         <span class="c"># total saved over the range</span></code></pre>
+
+  <p>
+    The panel shows <strong>nothing at all</strong> unless there are at least 3 samples in each
+    group, and nothing if <code>Δ ≤ 0</code>. A difference of means from one sample each is noise
+    with a decimal point, and a negative result means the bar wasn't faster — which is worth
+    knowing and not worth dressing up.
+  </p>
+
+  <div class="note note--warn">
+    <p><strong>This is an estimate, and here is exactly how it's biased.</strong>
+    The two groups are <em>self-selected, not assigned</em> — you answer on the bar when you happen
+    to see it and in VS Code when you were already sitting there. Prompts you miss entirely land in
+    <strong>V</strong> and sit a long time, pushing it up; prompts you catch because you were
+    already in the editor also land in <strong>V</strong> and resolve fast, pushing it down. The net
+    direction is unknown; this is an observational comparison, not a trial. Separately, granting
+    permission fires no hook — measured — so <strong>V</strong>'s wait is read from the tool
+    <em>starting</em>, tens of milliseconds late, which inflates the figure in the app's own favour.
+    The panel says so on screen.</p>
+  </div>
+
+  <h3 style="margin-top:40px">Measured latencies</h3>
+  <p>The app's own timings, against a live Claude Code session:</p>
+  <table>
+    <thead><tr><th>What</th><th>Measured</th></tr></thead>
+    <tbody>
+      <tr><td>Non-permission event → <code>204</code></td><td><strong>81 ms</strong></td></tr>
+      <tr><td>Allow clicked → <code>200</code> with the decision body</td><td>immediate, exact payload</td></tr>
+      <tr><td>No click → hold lapses to an empty <code>204</code></td><td><strong>15.0 s</strong> (the configured window)</td></tr>
+      <tr><td>A newer prompt supersedes an older hold</td><td><strong>2.8 s</strong></td></tr>
+      <tr><td>11 hooks pointed at a <strong>dead</strong> server → tool calls</td><td><strong>39 ms / 67 ms</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>What the formula yields</h3>
+  <p>
+    Not measurements — arithmetic, so the number the panel eventually shows has a shape you already
+    recognise. <code>S = Δ × n_B</code>, shown per day and per five-day week.
+  </p>
+  <table>
+    <thead><tr><th>Δ per prompt</th><th>3 prompts/day</th><th>10 prompts/day</th><th>25 prompts/day</th></tr></thead>
+    <tbody>
+      <tr><td><strong>5 s</strong></td><td>15 s · 1m15 /wk</td><td>50 s · 4m10 /wk</td><td>2m05 · 10m25 /wk</td></tr>
+      <tr><td><strong>15 s</strong></td><td>45 s · 3m45 /wk</td><td>2m30 · 12m30 /wk</td><td>6m15 · 31m15 /wk</td></tr>
+      <tr><td><strong>30 s</strong></td><td>1m30 · 7m30 /wk</td><td>5m · 25m /wk</td><td>12m30 · 62m30 /wk</td></tr>
+      <tr><td><strong>60 s</strong></td><td>3m · 15m /wk</td><td>10m · 50m /wk</td><td>25m · 125m /wk</td></tr>
+      <tr><td><strong>120 s</strong></td><td>6m · 30m /wk</td><td>20m · 100m /wk</td><td>50m · 250m /wk</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <p>Time saved needs <strong>permission decisions</strong> enabled — without Allow/Deny there is
+    no <strong>B</strong> group to compare against, and the panel says so rather than showing a
+    zero.</p>
+  </div>
+</section>
+
 <section id="start">
-  <p class="eyebrow">05 — Quick start</p>
+  <p class="eyebrow">06 — Quick start</p>
   <h2>Four commands.</h2>
 <pre><code>npm install &amp;&amp; npm run build
 npm start                                  <span class="c"># launch the bar</span>
@@ -319,7 +421,7 @@ node tools/install-hooks.mjs status        <span class="c"># confirm</span></cod
 </section>
 
 <section id="honest">
-  <p class="eyebrow">06 — Limits</p>
+  <p class="eyebrow">07 — Limits</p>
   <h2>What it <em>can't</em> do.</h2>
   <p>
     A limitation documented is worth more than a capability faked. The full ledger classifies

@@ -224,6 +224,52 @@ test('the "+N" badge counts live sessions only, never a disconnected one', () =>
   assert.equal(view.sessions.length, 2, 'but it is still listed, so the card can explain it');
 });
 
+/** A hand-built envelope, for sequences no captured fixture covers. */
+let clock = 1_700_000_000_000;
+const ev = (event, matcher) => ({
+  protocolVersion: 1,
+  matcher,
+  event,
+  receivedAt: (clock += 500),
+});
+
+test('a question Claude asked survives the "waiting for input" notification', () => {
+  const ask = 'Should I keep the old reducer as a fallback, or delete it?';
+  const afterStop = reduceAll(initialState, [
+    ev({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/w' }, 'startup'),
+    ev({ hook_event_name: 'UserPromptSubmit', session_id: 's1', cwd: '/w', prompt: 'go' }),
+    ev({ hook_event_name: 'Stop', session_id: 's1', cwd: '/w', last_assistant_message: ask }),
+  ]);
+  assert.equal(only(afterStop).status, 'COMPLETED');
+  assert.equal(only(afterStop).message, ask);
+
+  // Claude Code's idle notice lands a minute later. It must not overwrite the
+  // question with its own boilerplate -- the question is the whole point.
+  const afterNotice = reduceAll(afterStop, [
+    ev(
+      { hook_event_name: 'Notification', session_id: 's1', cwd: '/w', message: 'Claude is waiting for your input' },
+      'agent_needs_input',
+    ),
+  ]);
+  assert.equal(only(afterNotice).status, 'WAITING_FOR_INPUT');
+  assert.equal(only(afterNotice).message, ask, 'the question, not the label for it');
+});
+
+test('but a stale message from an older turn does not masquerade as the question', () => {
+  const s = reduceAll(initialState, [
+    ev({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/w' }, 'startup'),
+    ev({ hook_event_name: 'UserPromptSubmit', session_id: 's1', cwd: '/w', prompt: 'go' }),
+  ]);
+  assert.equal(only(s).status, 'WORKING');
+  const after = reduceAll(s, [
+    ev(
+      { hook_event_name: 'Notification', session_id: 's1', cwd: '/w', message: 'Claude is waiting for your input' },
+      'idle_prompt',
+    ),
+  ]);
+  assert.equal(only(after).message, 'Claude is waiting for your input');
+});
+
 // ------------------------------------------------------------ invariants
 
 test('no timer or clock can invent a transition: long silence stays WORKING', () => {

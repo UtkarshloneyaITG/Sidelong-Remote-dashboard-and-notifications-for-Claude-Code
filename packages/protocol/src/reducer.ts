@@ -307,7 +307,19 @@ function reduceSession(s: SessionState, env: IngestEnvelope): SessionState {
           return {
             ...base,
             status: 'WAITING_FOR_INPUT',
-            message: truncate(e.message, MAX_MESSAGE) || 'Claude is waiting for you',
+            // Keep what Claude actually SAID, when a completed turn just said it.
+            //
+            // The notification body is boilerplate -- "Claude is waiting for your
+            // input" -- while the last assistant message IS the question being
+            // asked. Taking the notification's wording replaced the one useful
+            // sentence on the bar with a label for it.
+            //
+            // Only from COMPLETED: that is the state a `Stop` just set, so the
+            // message is this turn's. In any other state it belongs to an older
+            // turn and the boilerplate, while dull, is at least current.
+            message: (base.status === 'COMPLETED' && base.message)
+              || truncate(e.message, MAX_MESSAGE)
+              || 'Claude is waiting for you',
           };
         case 'agent_completed':
           // Corroborates Stop. Stop is richer (it carries the summary line), so

@@ -38,6 +38,8 @@ const api = {
   decide: (sessionId: string, behavior: 'allow' | 'deny' | 'defer'): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('ui:decide', sessionId, behavior),
   quit: (): Promise<void> => ipcRenderer.invoke('ui:quit'),
+  /** Read-only: the banked per-day tallies behind the Analysis panel. */
+  stats: (): Promise<unknown> => ipcRenderer.invoke('ui:stats'),
   /**
    * Resize from a grip. Geometry only; clamped per mode in main. `anchor` is the
    * screen edge that must hold still, read once when the drag began.

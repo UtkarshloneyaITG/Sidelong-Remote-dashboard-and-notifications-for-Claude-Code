@@ -73,6 +73,7 @@ stops, and you find out when you happen to look. Multiply that by a dozen times 
 | **Answer prompts from the bar** *(opt-in)* | **Allow** / **Deny** without switching apps. Off by default — see [Permission decisions](#permission-decisions--allow--deny). |
 | **Act straight from the notification** | The toast carries an **Open VS Code** button, so you skip the overlay entirely. |
 | **See what waiting costs you** | The expanded card totals how long Claude actually sat blocked on you today. Nothing else can compute it. |
+| **See what it bought you** | [Analysis](#analysis--what-the-overlay-actually-bought-you) charts 7 / 14 / 30 days of blocked time and estimates time saved — from your own prompts, with the method and both of its biases stated on screen. |
 
 > [!IMPORTANT]
 > **Claude Code only — and the reason is transport, not events.**
@@ -366,6 +367,103 @@ different problems with different fixes, so they are shown differently.*
 > problem"* — which is neither what it means nor anything to do with the session sitting
 > next to it; it means **our** hooks are stale. An icon you have to open something else to
 > decode has already failed at being an icon, so it moved here and became words.
+
+## Analysis — what the overlay actually bought you
+
+`Analysis` in the expanded card opens a panel with a **7 / 14 / 30 day** filter, a bar per
+day of how long Claude spent blocked on you, totals for prompts, tool calls and turns, and
+one estimate: **time saved**.
+
+Every figure is a tally of hook events that actually arrived. They are kept for 30 days in
+`stats.json` next to your config, and go nowhere.
+
+### How time saved is calculated
+
+There is no way to observe what your day *would* have looked like without the overlay, so
+the app does not guess at one. It compares two things it can both measure — your own
+prompts, split by how they were resolved.
+
+**Definitions.** A permission prompt *i* arrives at `aᵢ` (when `PermissionRequest` lands)
+and resolves at `rᵢ`. Its wait is:
+
+```
+wᵢ = rᵢ − aᵢ
+```
+
+A prompt only enters the data once it has survived the **grace window** `G = 700 ms`. Below
+that it was auto-approved and never reached you — counting those would drag both averages
+toward zero with waits no human was ever part of.
+
+**Two disjoint populations.** Every counted prompt lands in exactly one:
+
+| | Set | How `rᵢ` is known |
+|---|---|---|
+| **B** | Answered in the bar | The instant you clicked Allow or Deny — exact |
+| **V** | Settled in VS Code / the terminal | When the prompt cleared, i.e. the tool started |
+
+A prompt is stamped for **B** at the click and tallied when it clears, so it cannot be
+counted in both.
+
+**The estimate.** Over the selected range, with `n` the count and `Σw` the summed wait:
+
+```
+w̄_B = Σw_B / n_B          mean wait when you answered here
+w̄_V = Σw_V / n_V          mean wait when you answered in VS Code
+
+Δ   = w̄_V − w̄_B           saving per prompt
+S   = Δ × n_B              total saved over the range
+```
+
+**Guards.** The panel shows nothing at all unless `n_B ≥ 3` **and** `n_V ≥ 3`, and nothing
+if `Δ ≤ 0`. A difference of means from one sample each is noise with a decimal point, and a
+negative result means the bar was not faster — which is worth knowing and not worth dressing
+up.
+
+> [!IMPORTANT]
+> **This is an estimate, and here is exactly how it is biased.**
+>
+> 1. The two groups are **self-selected, not assigned**. You answer in the bar when you
+>    happen to see it and in VS Code when you were already sitting there. Prompts you miss
+>    entirely land in **V** and sit a long time, pushing `w̄_V` up; prompts you catch because
+>    you were already in the editor also land in **V** and resolve fast, pushing it down. The
+>    net direction is unknown. This is an observational comparison, not a trial.
+> 2. **Granting permission fires no hook** — measured, not assumed. So for **V** the earliest
+>    evidence is the tool *running*, tens of milliseconds after you actually clicked. That
+>    overstates `w̄_V`, which inflates `Δ`. The bias here is small, but it is in the app's
+>    favour, so the panel says so on screen.
+
+### Benchmarks
+
+**Measured, on the running app.** These are the app's own latencies, timed against a live
+Claude Code session:
+
+| What | Measured |
+|---|---|
+| Non-permission event → `204` | **81 ms** |
+| Allow clicked → `200` with the decision body | immediate, exact payload |
+| No click → hold lapses to an empty `204` | **15.0 s** (the configured window) |
+| A newer prompt supersedes an older hold | **2.8 s** |
+| App killed mid-hold → buttons drop | **~2 s** |
+| 11 hooks pointed at a **dead** server → tool calls | **39 ms / 67 ms** |
+
+**What the formula yields.** Not measurements — arithmetic, so you can see the scale before
+you have enough data of your own. `S = Δ × n_B`, per day and per five-day week:
+
+| Δ per prompt | 3 prompts/day | 10 prompts/day | 25 prompts/day |
+|---|---|---|---|
+| **5 s** | 15 s · 1m15 /wk | 50 s · 4m10 /wk | 2m05 · 10m25 /wk |
+| **15 s** | 45 s · 3m45 /wk | 2m30 · 12m30 /wk | 6m15 · 31m15 /wk |
+| **30 s** | 1m30 · 7m30 /wk | 5m · 25m /wk | 12m30 · 62m30 /wk |
+| **60 s** | 3m · 15m /wk | 10m · 50m /wk | 25m · 125m /wk |
+| **120 s** | 6m · 30m /wk | 20m · 100m /wk | 50m · 250m /wk |
+
+Your own `Δ` is whatever the panel measures. The table exists so the number it eventually
+shows has a shape you already recognise.
+
+> [!NOTE]
+> Time saved needs **[permission decisions](#permission-decisions--allow--deny)** enabled —
+> without Allow/Deny there is no **B** population to compare against, and the panel says so
+> rather than showing a zero.
 
 ## Configuration
 
