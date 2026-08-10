@@ -25,6 +25,24 @@ when it is silently waiting on a permission prompt.
 
 ---
 
+> ### Official repository
+>
+> **Sidelong is created and maintained by [@gamith24](https://github.com/gamith24).**
+>
+> | | |
+> |---|---|
+> | **Source of truth** | <https://github.com/gamith24/sidelong-claude-code-status-bar> |
+> | **Website** | <https://gamith24.github.io/sidelong-claude-code-status-bar/> |
+> | **Releases** | [Signed-off builds produced by CI from tagged source](https://github.com/gamith24/sidelong-claude-code-status-bar/releases) — the only place official binaries come from |
+>
+> Copies and forks of this project exist, and the [licence](LICENSE) permits some
+> of them. **They are not maintained by, endorsed by, or connected to this
+> project**, they will not carry its releases, and per [`TRADEMARK.md`](TRADEMARK.md)
+> they may not present themselves as Sidelong. If you did not download from the
+> links above, you are not running the official build.
+
+---
+
 No API key. No telemetry. No network calls. Nothing leaves `127.0.0.1`.
 
 State comes from **Claude Code's own hook system** — a supported, documented integration
