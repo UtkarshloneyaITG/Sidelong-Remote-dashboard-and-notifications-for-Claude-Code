@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Shared types, the pure state reducer, and hook-config rules. ZERO runtime dependencies, on purpose: imported by the Electron main process, the renderer, and the VS Code extension.",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -3,7 +3,7 @@
   "version": "0.1.9",
   "private": true,
   "description": "The always-on-top overlay: hook receiver, state machine host, and UI.",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

@@ -16,7 +16,7 @@ when it is silently waiting on a permission prompt.
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-hooks-D97757?logo=anthropic&logoColor=white)
 [![CI](https://github.com/gamith24/sidelong-claude-code-status-bar/actions/workflows/ci.yml/badge.svg)](https://github.com/gamith24/sidelong-claude-code-status-bar/actions/workflows/ci.yml)
 [![Release](https://github.com/gamith24/sidelong-claude-code-status-bar/actions/workflows/release.yml/badge.svg)](https://github.com/gamith24/sidelong-claude-code-status-bar/actions/workflows/release.yml)
-[![License](https://img.shields.io/github/license/gamith24/sidelong-claude-code-status-bar?color=F5B544)](LICENSE)
+[![License](https://img.shields.io/badge/license-Prosperity%203.0.0-F5B544)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/gamith24/sidelong-claude-code-status-bar/total?color=F5B544)](https://github.com/gamith24/sidelong-claude-code-status-bar/releases)
 
 [Why](#why-this-exists) · [What you get](#what-you-get) · [Architecture](#architecture) · [Quick start](#quick-start) · [Using it](#using-it) · [Capabilities](#capabilities) · [Security](#security)
@@ -716,16 +716,36 @@ that was withdrawn and why.
 
 ## License
 
-**[MIT](LICENSE) — free for everyone, forever.**
+**[The Prosperity Public License 3.0.0](LICENSE)** — free for noncommercial use,
+thirty-day trial for commercial use.
 
-Use it, modify it, redistribute it, build a product on it, sell it. Commercial
-use is fine and you owe nothing. The only condition is that the copyright notice
-stays in copies of the source — that is the whole of it.
+| You are | What it costs |
+|---|---|
+| An individual, hobbyist or student using it on your own projects | **Free, forever.** Personal study, experiment, hobby projects and private use are explicitly not commercial use |
+| A charity, school, university, public research body, health, public-safety, environmental or government organisation | **Free, forever**, regardless of how you are funded |
+| Contributing changes back under a standard permissive licence | **Free** — contributing does not count as commercial use |
+| Using it for work, at any company | **Thirty-day trial**, then you need a commercial licence. One trial per company, not per person |
 
-No warranty is given, which is standard for MIT: if it breaks, you keep both
-pieces. Worth noting that the one failure mode people actually care about here is
-covered by design rather than by a legal disclaimer — hook failures are
-non-blocking, so Sidelong cannot take your coding session down with it.
+The source stays public and auditable — that has not changed, and it is the point.
+You can read every line, build it yourself, and check what produced the binary you
+downloaded. What the licence no longer grants is the right to sell it or ship it
+commercially without a licence.
+
+> [!IMPORTANT]
+> **Everything up to and including v0.1.9 was released under the MIT licence, and
+> stays MIT permanently.** That grant cannot be revoked and is not being revoked.
+> The MIT text is kept at [`LICENSE-MIT`](LICENSE-MIT) for exactly that reason. If
+> you want a version you may use commercially at no cost, v0.1.9 is it.
+
+The name and logo are handled separately — see [`TRADEMARK.md`](TRADEMARK.md). A
+code licence governs copying the software; it grants no right to the name.
+
+No warranty is given: if it breaks, you keep both pieces. Worth noting that the
+one failure mode people actually care about here is covered by design rather than
+by a legal disclaimer — hook failures are non-blocking, so Sidelong cannot take
+your coding session down with it.
+
+*Commercial licence enquiries: open an issue on the repository.*
 
 ## Permission decisions — Allow / Deny
 

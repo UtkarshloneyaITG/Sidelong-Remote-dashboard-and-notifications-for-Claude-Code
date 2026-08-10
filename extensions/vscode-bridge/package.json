@@ -5,7 +5,7 @@
   "description": "Companion to the Sidelong status bar for Claude Code. Sends workspace, active editor, focus and diagnostics to the overlay so notifications stay quiet while you are already looking at VS Code. It cannot observe Claude Code's state — that comes from hooks.",
   "// keywords": "The searchable surface. The product name is distinctive on purpose; the words people actually type go here and in the description, not in the name.",
   "keywords": ["claude", "claude code", "status bar", "agent", "overlay", "permission prompt"],
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "version": "0.1.9",
   "private": true,
   "publisher": "sidelong",

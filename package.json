@@ -3,7 +3,7 @@
   "version": "0.1.9",
   "private": true,
   "description": "Always-on-top overlay showing live Claude Code state, driven by Claude Code hooks.",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "workspaces": [
     "packages/*",
     "apps/*",

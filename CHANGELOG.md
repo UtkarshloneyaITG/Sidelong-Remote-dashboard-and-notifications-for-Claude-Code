@@ -9,6 +9,37 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **Licence: MIT → [The Prosperity Public License 3.0.0](LICENSE).** Free forever
+  for personal, hobby, academic, nonprofit and government use, and free for
+  contributing changes back. Commercial use gets a thirty-day trial, one per
+  company, after which it needs a commercial licence.
+
+  The source stays public and auditable — that is the point of it and none of it
+  changes. You can still read every line, build it yourself, and check what
+  produced the binary you downloaded. What is no longer granted is the right to
+  sell it or ship it commercially for free.
+
+  > **Everything up to and including v0.1.9 stays MIT, permanently.** That grant
+  > is irrevocable and is not being revoked. The MIT text is kept verbatim at
+  > `LICENSE-MIT` so the boundary is unambiguous, and v0.1.9 remains the version
+  > to take if you want one you may use commercially at no cost.
+
+  Not open source any more, and worth saying plainly: Prosperity is not
+  OSI-approved. Expect some corporate policies to disallow it and expect outside
+  contributions to dry up. That is the actual price of the change.
+
+- **Added [`TRADEMARK.md`](TRADEMARK.md).** A code licence governs copying the
+  software and grants no right to the *name* — a distinction that is easy to miss
+  and is how the Linux kernel, Rust, Firefox and PostgreSQL all operate. The code
+  is licensed; "Sidelong" and the logo are not. Fork it and rename it. No mark is
+  registered, and the file says so rather than implying otherwise.
+
+---
+
 ## [0.1.9] — 2026-08-10
 
 ### Documentation
