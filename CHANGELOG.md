@@ -9,6 +9,51 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **The bar's status light is an arc down the capsule's left rim**, lit by a
+  gradient that travels along it, in every state. It replaces the 8px dot in the
+  row: a dot has to be found and focused on, which is the wrong ask for an
+  overlay whose whole job is to be caught peripherally.
+
+  It is the left *border* of a rounded box, not a strip clipped by one — a strip
+  stays a rectangle whatever is clipping it, so it reads as a line with two hard
+  ends instead of following the rim. The gradient is a background masked down to
+  the border ring, since a border cannot itself hold one.
+
+- **A finished turn is white.** It used to be sky blue beside a working emerald
+  — two bright cool dots 8px apart in hue, which is a difference you have to go
+  looking for. Nothing else uses white.
+
+- **The status line is a ticker.** The old line leaves upward as the new one
+  arrives from below into the same spot. Only one is ever legible: the outgoing
+  one is fully transparent before the incoming one starts to appear — verified
+  frame by frame, at 50 ms only the old text is visible and at 149 ms only the
+  new. Transform and opacity only, so it composites off the main thread, and
+  `prefers-reduced-motion` gets a plain cut.
+
+- **`+N` counts live sessions only.** A disconnected session lingers in state
+  for its TTL so the expanded card can still explain where it went, but counting
+  it told you there were three windows to look at when two had already closed.
+
+### Removed
+
+- **The `⚠` on the capsule.** It reads as *"your code has a problem"*, which is
+  neither what it means nor anything to do with the session beside it — it means
+  **our** hooks are stale. An icon you must open something else to decode has
+  already failed at being an icon. Hook drift now says so in words in the
+  expanded card's footer, and the words are a button that opens the Hooks panel.
+
+### Fixed
+
+- **The footer wrapped once drift had something to say.** Sharing one flex row
+  pushed "Hooks listening" onto two lines and cut the bridge label to "VS Code
+  bri…" — a worse problem than the one being reported. Drift takes its own line.
+
+---
+
 ## [0.1.6] — 2026-08-10
 
 ### Added

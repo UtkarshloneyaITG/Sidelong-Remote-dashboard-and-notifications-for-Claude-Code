@@ -290,15 +290,31 @@ sliding across the screen. Your size is remembered per mode.
 > Native drag-resize and rounded corners cannot both exist, so the grips are ours and the
 > limits are enforced in the main process.
 
-| State | What you see |
-|-------|--------------|
-| Idle | `● Claude · project` + elapsed |
-| Working | `● project │ Reading src/app.ts` + elapsed |
-| Thinking | `● project │ Thinking…` — turn open, no tool running |
-| Auto-run | the command being run, **no buttons** — nothing to decide |
-| Permission | amber border, the real command, `[Open VS Code]` `[ok]` |
-| Completed | Claude's summary line |
-| Error | red dot, the real error class |
+State is carried by a **lit arc down the capsule's left rim** — a gradient that travels
+along it, so the bar reads at a glance from the edge of your vision without you having to
+find and focus on a dot.
+
+| State | Arc | What you see |
+|-------|-----|--------------|
+| Idle | grey | `Claude · project` + elapsed |
+| Working | green | `project │ Reading src/app.ts` + elapsed |
+| Thinking | green | `project │ Thinking…` — turn open, no tool running |
+| Auto-run | green | the command being run, **no buttons** — nothing to decide |
+| Permission | amber | amber border, the real command, `[Open VS Code]` `[ok]` |
+| Completed | **white** | Claude's summary line, timer stopped |
+| Error | red | the real error class |
+
+> [!NOTE]
+> White means **the turn is over**, and nothing else uses it. Before, a finished turn went
+> sky blue next to a working emerald — two bright cool dots 8px across, which is a
+> difference you have to go looking for. The end of a turn is the moment you most want to
+> catch without looking, so it gets the one colour no other state can take.
+
+The status line is a **ticker**: the old line leaves upward as the new one arrives from
+below, into the same spot. A silent in-place substitution is invisible unless you happen to
+be reading the bar at that instant — which is the wrong property for something you are
+meant to notice peripherally. Only one line is ever legible; the outgoing one has finished
+fading before the incoming one starts to appear.
 
 Buttons **fade in over the right edge** of the command rather than taking layout space, so
 the window never resizes and nothing jumps. Drag the bar anywhere; position is remembered.
@@ -342,8 +358,14 @@ Global shortcut, default `Ctrl+Shift+Space`: hidden → show, expanded → minim
 > `Ctrl+Alt+Space` is unbound on a stock setup.
 
 🟢 Hooks listening · 🔴 Receiver down · ⚫ VS Code bridge not connected · **no session** ·
-⚠️ hooks missing or drifted. *"Bridge disconnected" and "no agent session" are different
-problems with different fixes, so they are shown differently.*
+**Hooks out of date — reinstall**. *"Bridge disconnected" and "no agent session" are
+different problems with different fixes, so they are shown differently.*
+
+> [!NOTE]
+> Hook drift used to show as a bare `⚠` on the capsule. It reads as *"your code has a
+> problem"* — which is neither what it means nor anything to do with the session sitting
+> next to it; it means **our** hooks are stale. An icon you have to open something else to
+> decode has already failed at being an icon, so it moved here and became words.
 
 ## Configuration
 

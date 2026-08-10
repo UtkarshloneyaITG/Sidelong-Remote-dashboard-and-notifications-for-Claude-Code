@@ -95,7 +95,7 @@ export interface OverlayView {
   active?: SessionView;
   /** Every live session, most recently active first. */
   sessions: SessionView[];
-  /** How many sessions besides `active` -- renders as the "+2" badge. */
+  /** How many LIVE sessions besides `active` -- renders as the "+2" badge. */
   otherSessions: number;
   bridge: BridgeInfo;
   /** True once the hook receiver is listening. */
@@ -281,7 +281,11 @@ export function buildView(
     protocolVersion: 1,
     active,
     sessions,
-    otherSessions: Math.max(0, sessions.length - 1),
+    // Live sessions only. A DISCONNECTED session lingers in state for its TTL so
+    // the expanded card can still explain where it went, but counting it here
+    // told you there were three windows to look at when two had already closed.
+    // The badge exists to answer "how much else is going on right now".
+    otherSessions: sessions.filter((s) => s !== active && s.status !== 'DISCONNECTED').length,
     bridge: opts.bridge,
     ingestReady: opts.ingestReady,
     hookConfigDrift: opts.hookConfigDrift,

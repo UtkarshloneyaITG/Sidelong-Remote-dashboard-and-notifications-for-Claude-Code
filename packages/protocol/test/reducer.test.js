@@ -208,6 +208,22 @@ test('a session blocked on permission wins the pill over a more recent one', () 
   assert.equal(view.otherSessions, 1);
 });
 
+test('the "+N" badge counts live sessions only, never a disconnected one', () => {
+  const s = run('multi-session.jsonl');
+  const opts = {
+    now: 1_700_000_010_000, staleMs: 60_000,
+    bridge: { status: 'disconnected' }, ingestReady: true,
+  };
+  assert.equal(buildView(s, opts).otherSessions, 1);
+
+  // s-B closes its window. It stays in state for the TTL so the card can still
+  // account for it -- but there is no longer a second thing going on.
+  const closed = { ...s, sessions: { ...s.sessions, 's-B': { ...s.sessions['s-B'], status: 'DISCONNECTED' } } };
+  const view = buildView(closed, opts);
+  assert.equal(view.otherSessions, 0, 'a closed session is not "something else happening"');
+  assert.equal(view.sessions.length, 2, 'but it is still listed, so the card can explain it');
+});
+
 // ------------------------------------------------------------ invariants
 
 test('no timer or clock can invent a transition: long silence stays WORKING', () => {

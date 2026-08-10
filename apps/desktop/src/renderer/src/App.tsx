@@ -45,19 +45,41 @@ interface HookStatusPayload {
   url: string;
 }
 
+/**
+ * White is reserved for COMPLETED, and nothing else reaches it.
+ *
+ * A finished turn used to be sky blue next to a working emerald — two bright
+ * cool dots 8px across, which is a distinction you have to look for. The end of
+ * a turn is the moment you most want to catch from the corner of your eye, so it
+ * gets the one colour no other state uses.
+ */
 const DOT: Record<Severity, string> = {
   active: 'bg-emerald-400',
   attention: 'bg-amber-400',
-  success: 'bg-sky-400',
+  success: 'bg-white',
   error: 'bg-rose-500',
   neutral: 'bg-zinc-500',
   offline: 'bg-zinc-600',
 };
 
+/**
+ * The same states as `DOT`, as literal colour. The bar's light is drawn as an
+ * arc and lit by a gradient, and neither a border colour nor a CSS custom
+ * property can be a Tailwind class, so these are the values themselves.
+ */
+const EDGE_HEX: Record<Severity, string> = {
+  active: '#34d399', // emerald-400
+  attention: '#fbbf24', // amber-400
+  success: '#ffffff',
+  error: '#f43f5e', // rose-500
+  neutral: '#71717a', // zinc-500
+  offline: '#52525b', // zinc-600
+};
+
 const RING: Record<Severity, string> = {
   active: 'shadow-[0_0_0_3px_rgba(52,211,153,0.15)]',
   attention: 'shadow-[0_0_0_3px_rgba(251,191,36,0.20)]',
-  success: 'shadow-[0_0_0_3px_rgba(56,189,248,0.15)]',
+  success: 'shadow-[0_0_0_3px_rgba(255,255,255,0.14)]',
   error: 'shadow-[0_0_0_3px_rgba(244,63,94,0.20)]',
   neutral: '',
   offline: '',
@@ -140,6 +162,114 @@ function useGrip(edge: 'left' | 'right' | 'corner'): (e: React.PointerEvent<HTML
     grip.addEventListener('pointerup', up);
     grip.addEventListener('pointercancel', up);
   }, [edge]);
+}
+
+/**
+ * The bar's status light: a strip down the capsule's left edge, clipped by the
+ * parent's `rounded-full overflow-hidden` into a crescent that traces the rim.
+ *
+ * It replaces the 8px dot that used to sit in the row. Same information, but it
+ * reads at a glance from across a screen and without focusing on the bar, which
+ * is the entire point of a thing you are supposed to notice peripherally.
+ *
+ * The colour transitions rather than cutting, so a turn ending registers as
+ * movement even when you are not looking straight at it.
+ */
+function EdgeLight({ severity }: { severity: Severity }): JSX.Element {
+  return (
+    <span
+      aria-hidden
+      className="edge-flow pointer-events-none absolute inset-0 z-10 rounded-full"
+      // The LEFT BORDER of a rounded box, not a straight strip clipped by one.
+      // A strip stays a rectangle no matter what is clipping it, so it reads as
+      // a line with two hard ends; a border follows the radius the whole way and
+      // tapers into the rim, which is the shape the capsule already has.
+      //
+      // One variable is the entire state signal: the gradient, its motion and
+      // its glow are all derived from it, so no state can end up with a
+      // different treatment from the others by omission.
+      style={{ ['--edge' as string]: EDGE_HEX[severity] } as React.CSSProperties}
+    />
+  );
+}
+
+type Tone = 'plain' | 'command' | 'prompt' | 'hint';
+
+/** The pill itself. Fixed height in every tone, so a chip appearing around the
+ *  text cannot make the line jump vertically -- it only fades in. */
+const TONE_BOX: Record<Tone, string> = {
+  plain: 'px-0',
+  command: 'rounded-md bg-zinc-800/80 px-2.5',
+  prompt: 'rounded-md bg-amber-500/12 px-2.5',
+  hint: 'px-0',
+};
+
+/** Carried by each LINE, so an outgoing one keeps the type it left as. */
+const TONE_TEXT: Record<Tone, string> = {
+  plain: 'text-[11.5px] text-zinc-400',
+  command: 'font-mono text-[11.5px] text-zinc-300',
+  prompt: 'font-mono text-[11.5px] text-amber-100',
+  hint: 'text-[11px] text-amber-300',
+};
+
+/**
+ * The status line, as a ticker.
+ *
+ * Claude's state changes constantly -- thinking, running, reading, editing --
+ * and the old behaviour was to swap the text in place. A silent substitution is
+ * invisible unless you happen to be reading the bar at that instant, which is
+ * exactly the wrong property for an overlay you are meant to catch out of the
+ * corner of your eye.
+ *
+ * So the outgoing line leaves upward and the new one arrives from below, into
+ * the same spot. The pill is `overflow-hidden`, the leaving line is absolute and
+ * fades before the arriving one is legible, and the two never read as a stack.
+ *
+ * The OUTGOING line keeps the tone it was rendered with. Restyling something on
+ * its way out -- a command chip turning into plain text mid-flight -- reads as a
+ * glitch rather than a transition.
+ */
+function StatusTicker({ text, tone }: { text: string; tone: Tone }): JSX.Element {
+  const [cur, setCur] = useState({ text, tone, key: 0 });
+  const [prev, setPrev] = useState<typeof cur | null>(null);
+
+  useEffect(() => {
+    setCur((c) => {
+      if (c.text === text && c.tone === tone) return c;
+      setPrev(c);
+      return { text, tone, key: c.key + 1 };
+    });
+  }, [text, tone]);
+
+  return (
+    // The outer cell is flex-1 and never changes size, so the clock and the
+    // buttons to its right cannot be pushed around by a longer message. Only
+    // the pill inside it grows, and it grows into space that is already spoken
+    // for.
+    <span className="flex min-w-0 flex-1 items-center">
+      <span
+        className={`tick relative flex h-[26px] items-center overflow-hidden ${TONE_BOX[tone]}`}
+        title={text}
+      >
+        {prev && (
+          <span
+            key={prev.key}
+            aria-hidden
+            className={`tick__line tick__line--out flex items-center truncate ${TONE_TEXT[prev.tone]}`}
+            onAnimationEnd={() => setPrev(null)}
+          >
+            {prev.text}
+          </span>
+        )}
+        <span
+          key={cur.key}
+          className={`tick__line tick__line--in min-w-0 truncate ${TONE_TEXT[cur.tone]}`}
+        >
+          {cur.text}
+        </span>
+      </span>
+    </span>
+  );
 }
 
 function Dot({ severity, pulse }: { severity: Severity; pulse?: boolean }): JSX.Element {
@@ -382,6 +512,8 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
         pending ? 'border-amber-500/60' : 'border-zinc-700/80'
       }`}
     >
+      <EdgeLight severity={severity} />
+
       {/* Width-only grips on BOTH edges -- reaching for either one is the
           instinct, and a grip you have to guess the side of is not a grip.
           Each anchors the opposite edge, so the capsule grows away from the
@@ -402,8 +534,7 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       />
 
-      <span className="flex shrink-0 items-center gap-2 pl-0.5">
-        <Dot severity={severity} pulse={Boolean(pending) || (a?.status === 'WORKING' && !a.stale)} />
+      <span className="flex shrink-0 items-center gap-2 pl-1.5">
         <span className="max-w-[110px] truncate text-[11.5px] font-medium text-zinc-200">
           {a?.project ?? (a ? 'Claude' : 'No session')}
         </span>
@@ -416,34 +547,20 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
 
       {/* The one flexible cell. It always occupies the same space, so nothing
           below re-flows when a command starts, ends, or a prompt arrives. */}
-      {hint ? (
-        <span className="min-w-0 flex-1 truncate text-[11px] text-amber-300">{hint}</span>
-      ) : asCommand || deciding ? (
-        <span
-          className={`min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-[11.5px] transition-colors duration-300 ${
-            pending ? 'bg-amber-500/12 text-amber-100' : 'bg-zinc-800/80 text-zinc-300'
-          }`}
-          title={headline}
-        >
-          {headline}
-        </span>
-      ) : (
-        <span className="min-w-0 flex-1 truncate text-[11.5px] text-zinc-400">
-          {headline ?? 'Waiting for a Claude Code session.'}
-        </span>
-      )}
+      <StatusTicker
+        text={hint ?? headline ?? 'Waiting for a Claude Code session.'}
+        tone={hint ? 'hint' : asCommand || deciding ? (pending ? 'prompt' : 'command') : 'plain'}
+      />
 
       <span className="shrink-0 font-mono text-[11px] tabular-nums text-zinc-400">
         {a && (a.turnStartedAt ?? a.elapsedMs) ? clock(elapsed) : ''}
       </span>
 
-      {/* Hooks not installed / drifted means the overlay will simply never
-          update. Surfaced here too, or the bar would look merely idle. */}
-      {view.hookConfigDrift && (
-        <span className="shrink-0 text-[11px] text-amber-400" title={view.hookConfigDrift}>
-          ⚠
-        </span>
-      )}
+      {/* Hook drift lives in the expanded card now, in words. A bare ⚠ on the
+          capsule read as "your code has a problem" -- it means neither that nor
+          anything about the session it sat next to, only that OUR hooks are out
+          of date. An icon that makes you open something to find out what it
+          means has already failed at being an icon. */}
       <button
         type="button"
         aria-label="Expand"
@@ -548,22 +665,45 @@ function MinimizedBar({ view, elapsed }: { view: RendererView; elapsed: number }
 
 // ------------------------------------------------------------------- shell
 
-function ConnectionRow({ view }: { view: RendererView }): JSX.Element {
+function ConnectionRow({ view, onFix }: { view: RendererView; onFix: () => void }): JSX.Element {
   const bridge = view.bridge.status;
   const bridgeDot = bridge === 'connected' ? 'bg-emerald-400'
     : bridge === 'reconnecting' ? 'bg-amber-400' : 'bg-zinc-600';
   return (
-    <div className="mt-auto flex items-center gap-2 border-t border-zinc-800/80 px-2.5 py-1.5 text-[10px] text-zinc-500">
-      <span className={`h-1.5 w-1.5 rounded-full ${view.ingestReady ? 'bg-emerald-400' : 'bg-rose-500'}`} />
-      <span>{view.ingestReady ? 'Hooks listening' : 'Receiver down'}</span>
-      <span className="text-zinc-700">·</span>
-      <span className={`h-1.5 w-1.5 rounded-full ${bridgeDot}`} />
-      <span className="truncate">
-        {bridge === 'connected' ? 'VS Code bridge' : 'VS Code bridge not connected'}
-      </span>
-      {!view.sessions.length && view.ingestReady && (
-        <span className="ml-auto shrink-0 text-zinc-600">no session</span>
+    <div className="mt-auto border-t border-zinc-800/80 px-2.5 py-1.5 text-[10px] text-zinc-500">
+      {/* Drift is the one condition here that makes everything BELOW it
+          untrustworthy: the hooks Claude Code has installed no longer match the
+          ones this app expects, so the overlay can go quietly out of date.
+          It gets its own line -- squeezed into the status row it pushed
+          "Hooks listening" onto two lines and truncated the bridge label to
+          "VS Code bri…", which is a worse problem than the one it reports.
+          It is a button, because "reinstall" should not be a dead end. */}
+      {view.hookConfigDrift && (
+        <button
+          type="button"
+          onClick={onFix}
+          title={view.hookConfigDrift}
+          className="no-drag mb-1 block w-full truncate text-left text-amber-400/90 hover:text-amber-300"
+        >
+          Hooks out of date — reinstall
+        </button>
       )}
+      <div className="flex items-center gap-2">
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${view.ingestReady ? 'bg-emerald-400' : 'bg-rose-500'}`}
+        />
+        <span className="shrink-0 whitespace-nowrap">
+          {view.ingestReady ? 'Hooks listening' : 'Receiver down'}
+        </span>
+        <span className="shrink-0 text-zinc-700">·</span>
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${bridgeDot}`} />
+        <span className="truncate">
+          {bridge === 'connected' ? 'VS Code bridge' : 'VS Code bridge not connected'}
+        </span>
+        {!view.sessions.length && view.ingestReady && (
+          <span className="ml-auto shrink-0 text-zinc-600">no session</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -710,7 +850,7 @@ export default function App(): JSX.Element {
           </div>
         )}
 
-        <ConnectionRow view={view} />
+        <ConnectionRow view={view} onFix={() => setSetupOpen(true)} />
         {setupOpen && <Setup onClose={() => setSetupOpen(false)} />}
       </div>
 

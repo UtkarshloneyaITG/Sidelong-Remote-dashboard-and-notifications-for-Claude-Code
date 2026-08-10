@@ -29,6 +29,159 @@ input {
   -webkit-app-region: no-drag;
 }
 
+/* ---------------------------------------------------------- edge light motion
+ *
+ * "Something is happening" on the bar's left arc.
+ *
+ * Not a pulse: fading the whole arc in and out is the visual grammar of an
+ * alert, so a perfectly ordinary working session read as a warning. A gradient
+ * travelling along the arc says the same thing as continuous motion, which is
+ * what a running turn actually is.
+ *
+ * The arc is a border, and a border cannot hold a gradient -- so the gradient is
+ * a background painted over the whole border box, then masked down to the border
+ * ring: two mask layers, minus the padding box. Only the left border has width,
+ * so only the left arc lights up, and the mask follows the radius exactly.
+ */
+/* Registering the property is what lets it TRANSITION. An unregistered custom
+   property has no type, so the browser can only swap it -- and the whole point
+   of the colour carrying the state is that a change is something you catch
+   moving, not something you notice afterwards. */
+@property --edge {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: #52525b;
+}
+
+.edge-flow {
+  border-width: 0;
+  border-left-width: 7px;
+  border-style: solid;
+  border-color: transparent;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--edge) 22%, transparent) 0%,
+      var(--edge) 30%,
+      color-mix(in oklab, white 45%, var(--edge)) 50%,
+      var(--edge) 70%,
+      color-mix(in oklab, var(--edge) 22%, transparent) 100%
+    )
+    border-box;
+  /* A fixed tile, so the loop is seamless: the travel below is exactly one tile,
+     and the gradient's two ends are the same colour. */
+  background-size: 100% 120px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: edge-flow 2.4s linear infinite;
+  transition: --edge 700ms ease;
+}
+
+@keyframes edge-flow {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 120px;
+  }
+}
+
+/* ------------------------------------------------------------- status ticker
+ *
+ * One line of status at a time. The old line leaves upward, the new one arrives
+ * from below into the same spot, so a change reads as movement in peripheral
+ * vision rather than as text that silently became different text.
+ *
+ * The outgoing line is taken OUT of flow (absolute) and the incoming one is left
+ * in it, so the container measures only the message that is arriving -- that is
+ * what lets the pill's width follow the text instead of snapping.
+ *
+ * Transform + opacity only: both are compositor properties, so the whole thing
+ * runs off the main thread and cannot be janked by a burst of hook events.
+ */
+.tick {
+  /* Lets `width` animate to a content-derived size instead of jumping to it. */
+  interpolate-size: allow-keywords;
+  width: fit-content;
+  max-width: 100%;
+  transition:
+    width 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 300ms ease;
+}
+
+.tick__line {
+  will-change: transform, opacity;
+}
+
+/* Arrives from below. It holds at opacity 0 through the first third, which is
+   exactly as long as the outgoing line takes to disappear -- the two move at the
+   same time but are never both legible, which is the whole requirement. */
+.tick__line--in {
+  animation: tick-in 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Leaves upward. Absolute, so it no longer contributes to the pill's width --
+   which is what lets the pill start resizing to the arriving text immediately
+   instead of waiting for the old one to finish leaving. Inset to the padding
+   box, never the border box, or the text shifts sideways as it goes. */
+.tick__line--out {
+  position: absolute;
+  inset: 0 auto;
+  animation: tick-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* 100%, not less: the line has to clear the pill entirely. At 65% it merely
+   moved up a few pixels and sat there in full view above its replacement. */
+@keyframes tick-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  35% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes tick-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -100%, 0);
+  }
+}
+
+/* Motion is the whole mechanism here, so reduced-motion gets a plain cut rather
+   than a slower slide -- and the width stops animating too, since a growing pill
+   is the same vestibular problem in another direction. */
+@media (prefers-reduced-motion: reduce) {
+  /* The gradient stays -- it is a colour, not a movement -- but stops travelling. */
+  .edge-flow {
+    animation: none;
+  }
+  .tick {
+    transition: background-color 300ms ease;
+  }
+  .tick__line--in,
+  .tick__line--out {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
