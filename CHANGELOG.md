@@ -9,6 +9,34 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [1.1.3] — 2026-08-11
+
+### Fixed
+
+- **The two release jobs were racing each other for the same release.** v1.1.2 got
+  Linux binaries and lost the Windows ones — which had all built perfectly:
+
+  ```
+  Error: Cannot upload asset sidelong-claude-status-bar.vsix to an immutable
+  release. GitHub only allows asset uploads before a release is published.
+  ```
+
+  Both platform jobs independently created and published the same release. This
+  repository has **immutable releases** enabled, so whichever finished first
+  published it and locked it, and every upload from the other was refused. Linux
+  won that race, so v1.1.2 shipped an AppImage and a `.deb` and no `.exe` at all.
+
+  Restructured: **two builders, then one publisher.** Neither platform job touches
+  the release now — they hand their output to `upload-artifact`, and a third job
+  that waits for both downloads everything and creates the release once, complete
+  on arrival. The race cannot happen because there is only one writer.
+
+  The publisher runs on `always()`, so if one platform fails the other still
+  ships and the run still goes red. A partial release that says so beats a
+  green-looking tag with no binaries on it.
+
+---
+
 ## [1.1.2] — 2026-08-11
 
 ### Fixed
@@ -629,6 +657,7 @@ See [docs/CAPABILITIES.md](docs/CAPABILITIES.md). The significant ones: permissi
 during model inference; and macOS and Linux build in CI but their overlay
 behaviour is untested.
 
+[1.1.3]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.3
 [1.1.2]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.2
 [1.1.1]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.1
 [1.1.0]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.0

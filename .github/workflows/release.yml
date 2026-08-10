@@ -8,6 +8,18 @@ on:
 permissions:
   contents: write
 
+# Two builders, then ONE publisher.
+#
+# The obvious shape -- each platform job attaching its own files -- raced and
+# lost. Both jobs create the same release, and this repo has immutable releases
+# on: whichever finishes first publishes it, and GitHub then refuses every later
+# upload with "Cannot upload asset to an immutable release". In v1.1.2 Linux won
+# the race, so a perfectly good set of Windows binaries was built and then had
+# nowhere to go.
+#
+# So the builders no longer touch the release at all. They hand their artifacts
+# to the runner, and a third job that waits for both publishes everything once.
+# One release, created once, complete on arrival.
 jobs:
   windows:
     name: Build Windows binaries
@@ -35,23 +47,22 @@ jobs:
       - name: Package the VS Code extension
         run: npm run package -w sidelong-claude-status-bar
 
-      - name: Attach artifacts to the release
-        uses: softprops/action-gh-release@v2
+      - name: Hand over the artifacts
+        uses: actions/upload-artifact@v4
         with:
-          draft: false
-          generate_release_notes: true
-          files: |
+          name: windows
+          if-no-files-found: error
+          path: |
             release/Sidelong-Setup-*.exe
             release/Sidelong-*-portable.exe
             extensions/vscode-bridge/sidelong-claude-status-bar.vsix
 
-  # Separate job because Linux artifacts need a Linux runner -- electron-builder
-  # cannot produce an AppImage or a .deb from Windows. It attaches to the same
-  # release; whichever job finishes second adds its files to it.
+  # Linux artifacts need a Linux runner: electron-builder cannot produce an
+  # AppImage or a .deb from Windows.
   #
-  # These builds are UNVERIFIED: nobody has confirmed always-on-top, tray or
-  # notification behaviour on a Linux desktop. Shipped so they can be, and said
-  # plainly in the README rather than implied by their existence.
+  # These builds are UNVERIFIED. Nobody has confirmed always-on-top, tray or
+  # notification behaviour on a Linux desktop -- CI proves they compile, which is
+  # a different claim, and the README says so rather than implying otherwise.
   linux:
     name: Build Linux binaries
     runs-on: ubuntu-latest
@@ -73,17 +84,41 @@ jobs:
       - name: Package AppImage + deb
         run: npm run dist -w @sidelong/desktop
 
-      # `always()` on purpose. These are two independent targets, and v1.1.1
-      # proved they fail independently: the AppImage built cleanly and was then
-      # thrown away because the .deb could not find a Debian maintainer field.
-      # Attaching whatever exists means one broken target costs you that target,
-      # not the whole platform. The job still goes red, so nothing is hidden.
-      - name: Attach artifacts to the release
+      # `always()`, because AppImage and .deb are independent targets that fail
+      # independently -- v1.1.1 built a clean AppImage and threw it away when the
+      # .deb could not find a maintainer field. One broken target should cost you
+      # that target, not the platform. The job still goes red, so nothing hides.
+      - name: Hand over the artifacts
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          if-no-files-found: warn
+          path: |
+            release/Sidelong-*.AppImage
+            release/Sidelong-*.deb
+
+  publish:
+    name: Publish the release
+    runs-on: ubuntu-latest
+    needs: [windows, linux]
+    # Publish whatever was built. If one platform failed, the other still ships
+    # and the run is still red -- the alternative is a green-looking tag with no
+    # binaries at all, which is worse than a partial release that says so.
+    if: always()
+    steps:
+      - name: Collect every builder's output
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List what is about to be published
+        run: find artifacts -type f | sort
+
+      - name: Create the release, once, with everything
         uses: softprops/action-gh-release@v2
         with:
           draft: false
           generate_release_notes: true
-          files: |
-            release/Sidelong-*.AppImage
-            release/Sidelong-*.deb
+          fail_on_unmatched_files: false
+          files: artifacts/**/*

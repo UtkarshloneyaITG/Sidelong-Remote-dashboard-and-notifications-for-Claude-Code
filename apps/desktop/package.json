@@ -1,6 +1,6 @@
 {
   "name": "@sidelong/desktop",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "// desktopName": "The .desktop file name, used as app_id/WM_CLASS so a Linux desktop can link the running window to its launcher entry.",
   "desktopName": "sidelong.desktop",
   "private": true,
