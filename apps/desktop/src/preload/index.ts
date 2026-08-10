@@ -49,6 +49,18 @@ const api = {
     height: number,
     anchor?: { side: 'left' | 'right'; x: number },
   ): Promise<void> => ipcRenderer.invoke('ui:resize', width, height, anchor),
+  /**
+   * Settings. Reads and writes the user's own preferences and nothing else --
+   * the token is never returned, and there is still no channel here that can set
+   * an agent status.
+   */
+  settings: {
+    get: (): Promise<unknown> => ipcRenderer.invoke('settings:get'),
+    set: (patch: Record<string, unknown>): Promise<unknown> =>
+      ipcRenderer.invoke('settings:set', patch),
+    clearStats: (): Promise<unknown> => ipcRenderer.invoke('settings:clear-stats'),
+    openDataDir: (): Promise<unknown> => ipcRenderer.invoke('settings:open-data-dir'),
+  },
   hooks: {
     status: (): Promise<unknown> => ipcRenderer.invoke('hooks:status'),
     install: (scope: 'user' | 'project'): Promise<unknown> => ipcRenderer.invoke('hooks:install', scope),

@@ -32,6 +32,12 @@ declare global {
       ): Promise<void>;
       quit(): Promise<void>;
       stats(): Promise<StatsPayload>;
+      settings: {
+        get(): Promise<SettingsPayload>;
+        set(patch: Partial<SettingsPayload>): Promise<SettingsResult>;
+        clearStats(): Promise<{ ok: boolean }>;
+        openDataDir(): Promise<{ ok: boolean; dir: string; error?: string }>;
+      };
       hooks: {
         status(): Promise<HookStatusPayload>;
         install(scope: 'user' | 'project'): Promise<unknown>;
@@ -51,6 +57,28 @@ interface StatsPayload {
     /** `commandKey` → prompts about it. Program name and one subcommand only. */
     commands: Record<string, number>;
   }[];
+}
+
+interface SettingsPayload {
+  port: number;
+  shortcut: string;
+  staleMs: number;
+  completedDismissMs: number;
+  debugLog: boolean;
+  notifications: boolean;
+  permissionDecisions: boolean;
+  decisionWindowMs: number;
+  openAtLogin: boolean;
+  version: string;
+  dataDir: string;
+  restartRequired: boolean;
+}
+
+interface SettingsResult {
+  ok: boolean;
+  /** Scopes whose hooks were rewritten because the decision timeout moved. */
+  reinstalled: string[];
+  restartRequired: boolean;
 }
 
 interface HookStatusPayload {
@@ -628,67 +656,290 @@ function Analysis({ onClose }: { onClose: () => void }): JSX.Element {
   );
 }
 
+/** A labelled group. Sections are the whole navigation — there are no tabs. */
+function Group({ title, note, children }: {
+  title: string; note?: string; children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <div className="mt-3 rounded border border-zinc-800 p-2">
+      <div className="text-[10px] uppercase tracking-wider text-zinc-600">{title}</div>
+      {note && <p className="mt-1 text-[9.5px] leading-relaxed text-zinc-600">{note}</p>}
+      <div className="mt-2 space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function Toggle({ label, note, checked, onChange }: {
+  label: string; note?: string; checked: boolean; onChange: (v: boolean) => void;
+}): JSX.Element {
+  return (
+    <label className="no-drag flex cursor-pointer items-start gap-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-3 w-3 shrink-0 accent-amber-400"
+      />
+      <span className="min-w-0">
+        <span className="block text-[11px] text-zinc-300">{label}</span>
+        {note && <span className="mt-0.5 block text-[9.5px] leading-relaxed text-zinc-600">{note}</span>}
+      </span>
+    </label>
+  );
+}
+
+/** Seconds in, milliseconds out — nobody wants to think in ms. */
+function Seconds({ label, note, value, min, max, step = 1, onCommit }: {
+  label: string; note?: string; value: number;
+  min: number; max: number; step?: number; onCommit: (ms: number) => void;
+}): JSX.Element {
+  const [draft, setDraft] = useState(String(Math.round(value / 1000)));
+  useEffect(() => setDraft(String(Math.round(value / 1000))), [value]);
+  const commit = (): void => {
+    const n = Number(draft);
+    if (!Number.isFinite(n)) return void setDraft(String(Math.round(value / 1000)));
+    const ms = Math.min(max, Math.max(min, Math.round(n))) * 1000;
+    onCommit(ms);
+  };
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 text-[11px] text-zinc-300">{label}</span>
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+          className="no-drag w-14 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right font-mono text-[11px] tabular-nums text-zinc-200"
+        />
+        <span className="font-mono text-[10px] text-zinc-600">s</span>
+      </div>
+      {note && <p className="mt-1 text-[9.5px] leading-relaxed text-zinc-600">{note}</p>}
+    </div>
+  );
+}
+
+/**
+ * Settings, with hook installation folded in as one section of it.
+ *
+ * The panel does the work the config file used to make you do by hand, and it
+ * owns the CONSEQUENCES of each change rather than leaving them to drift
+ * detection: switching decisions on rewrites the installed hooks in place,
+ * because the timeout lives inside them, and changing the port says plainly that
+ * it needs a restart instead of appearing to have worked.
+ */
 function Setup({ onClose }: { onClose: () => void }): JSX.Element {
   const [status, setStatus] = useState<HookStatusPayload | null>(null);
+  const [cfg, setCfg] = useState<SettingsPayload | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [confirmWipe, setConfirmWipe] = useState(false);
+
   const refresh = useCallback(() => {
     void window.watcher.hooks.status().then(setStatus);
+    void window.watcher.settings.get().then(setCfg);
   }, []);
   useEffect(refresh, [refresh]);
 
+  // Every write goes through here, so the CONSEQUENCES of a change are reported
+  // in one place rather than remembered at each call site.
+  const save = useCallback((patch: Partial<SettingsPayload>) => {
+    setCfg((c) => (c ? { ...c, ...patch } : c));
+    void window.watcher.settings.set(patch).then((r) => {
+      const bits: string[] = [];
+      if (r.reinstalled.length) bits.push(`hooks reinstalled (${r.reinstalled.join(', ')})`);
+      if (r.restartRequired) bits.push('restart required for the new port');
+      setNote(bits.length ? bits.join(' · ') : null);
+      refresh();
+    });
+  }, [refresh]);
+
   return (
-    <div className="absolute inset-0 z-10 flex flex-col bg-zinc-950 p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-zinc-200">Hook setup</span>
+    <div className="absolute inset-0 z-10 flex flex-col overflow-y-auto bg-zinc-950 p-3">
+      <div className="sticky top-0 flex items-center justify-between bg-zinc-950 pb-1">
+        <span className="text-[11px] font-medium text-zinc-200">Settings</span>
         <button type="button" className="no-drag text-[11px] text-zinc-500 hover:text-zinc-200" onClick={onClose}>
           close
         </button>
       </div>
+
+      {note && (
+        <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">
+          {note}
+        </p>
+      )}
+
       {status && (
-        <>
-          <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-400">
-            Sidelong listens on <span className="font-mono text-zinc-300">127.0.0.1:{status.port}</span> and
-            installs Claude Code hooks that POST there. Nothing leaves this machine.
-          </p>
+        <Group
+          title="Hooks"
+          note={`Sidelong listens on 127.0.0.1:${status.port} and installs Claude Code hooks that POST there. Nothing leaves this machine.`}
+        >
           {status.message && (
-            <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10.5px] text-amber-200">
+            <p className="rounded border border-amber-500/30 bg-amber-500/10 p-1.5 text-[10px] text-amber-200">
               {status.message}
             </p>
           )}
-          <div className="mt-3 space-y-2">
-            {(['user', 'project'] as const).map((scope) => (
-              <div key={scope} className="rounded border border-zinc-800 p-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-zinc-300">
-                    {scope === 'user' ? 'All projects' : 'This project only'}
-                  </span>
-                  <span className={`text-[10px] ${status[scope].installed ? 'text-emerald-400' : 'text-zinc-600'}`}>
-                    {status[scope].installed ? 'installed' : 'not installed'}
-                  </span>
-                </div>
-                <div className="mt-0.5 truncate font-mono text-[9.5px] text-zinc-600">{status[scope].path}</div>
-                <div className="mt-1.5 flex gap-1.5">
-                  <button
-                    type="button"
-                    className="no-drag rounded bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-900 hover:bg-white"
-                    onClick={() => void window.watcher.hooks.install(scope).then(refresh)}
-                  >
-                    Install
-                  </button>
-                  <button
-                    type="button"
-                    className="no-drag rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100"
-                    onClick={() => void window.watcher.hooks.uninstall(scope).then(refresh)}
-                  >
-                    Remove
-                  </button>
-                </div>
+          {(['user', 'project'] as const).map((scope) => (
+            <div key={scope} className="rounded border border-zinc-800 p-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-zinc-300">
+                  {scope === 'user' ? 'All projects' : 'This project only'}
+                </span>
+                <span className={`text-[10px] ${status[scope].installed ? 'text-emerald-400' : 'text-zinc-600'}`}>
+                  {status[scope].installed ? 'installed' : 'not installed'}
+                </span>
               </div>
-            ))}
-          </div>
-          <p className="mt-auto pt-2 text-[10px] text-zinc-600">
+              <div className="mt-0.5 truncate font-mono text-[9.5px] text-zinc-600">{status[scope].path}</div>
+              <div className="mt-1.5 flex gap-1.5">
+                <button
+                  type="button"
+                  className="no-drag rounded bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-900 hover:bg-white"
+                  onClick={() => void window.watcher.hooks.install(scope).then(refresh)}
+                >
+                  Install
+                </button>
+                <button
+                  type="button"
+                  className="no-drag rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100"
+                  onClick={() => void window.watcher.hooks.uninstall(scope).then(refresh)}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+          <p className="text-[9.5px] text-zinc-600">
             Verify inside Claude Code with <span className="font-mono text-zinc-500">/hooks</span>. Closing
             Sidelong never affects a running session.
           </p>
+        </Group>
+      )}
+
+      {cfg && (
+        <>
+          <Group
+            title="Permission decisions"
+            note="Off by default. It changes what this app is: a watcher gains the ability to approve a command. Turning it on, or moving the window, rewrites the installed hooks — the timeout lives inside them."
+          >
+            <Toggle
+              label="Answer prompts from the bar"
+              note="Adds Allow / Deny. While a decision is outstanding the tool call is blocked and VS Code's own prompt does not appear, so ignoring the bar delays the normal prompt."
+              checked={cfg.permissionDecisions}
+              onChange={(v) => save({ permissionDecisions: v })}
+            />
+            {cfg.permissionDecisions && (
+              <Seconds
+                label="Decision window"
+                note="The longest this app can ever stall one tool call. When it lapses Claude Code prompts you normally — nothing is lost."
+                value={cfg.decisionWindowMs}
+                min={3}
+                max={60}
+                onCommit={(ms) => save({ decisionWindowMs: ms })}
+              />
+            )}
+          </Group>
+
+          <Group title="Behaviour">
+            <Toggle
+              label="Desktop notifications"
+              note="A toast when a session needs you, finishes, or fails. On by default — a permission prompt nobody sees is the problem this app exists for. Turning it off leaves the bar working; it just stops interrupting whatever is in front of you."
+              checked={cfg.notifications}
+              onChange={(v) => save({ notifications: v })}
+            />
+            <Toggle
+              label="Start with Windows"
+              checked={cfg.openAtLogin}
+              onChange={(v) => save({ openAtLogin: v })}
+            />
+            <Seconds
+              label="Call it stale after"
+              note="How long silence lasts before the bar stops claiming Claude is working and says how long it has been instead. It never changes the status — only what it admits to knowing."
+              value={cfg.staleMs}
+              min={15}
+              max={600}
+              onCommit={(ms) => save({ staleMs: ms })}
+            />
+            <Seconds
+              label="Collapse when done after"
+              note="0 keeps the card open until you close it."
+              value={cfg.completedDismissMs}
+              min={0}
+              max={300}
+              onCommit={(ms) => save({ completedDismissMs: ms })}
+            />
+          </Group>
+
+          <Group title="Data" note={`Kept in ${cfg.dataDir}, and sent nowhere.`}>
+            <Toggle
+              label="Write a debug log"
+              note="Records every hook event to disk, INCLUDING tool inputs — which carry whole file contents and full command strings. Off by default for exactly that reason. Turn it on while chasing something, then turn it off."
+              checked={cfg.debugLog}
+              onChange={(v) => save({ debugLog: v })}
+            />
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                className="no-drag rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100"
+                onClick={() => void window.watcher.settings.openDataDir()}
+              >
+                Open folder
+              </button>
+              {confirmWipe ? (
+                <>
+                  <button
+                    type="button"
+                    className="no-drag rounded bg-rose-500/90 px-2 py-0.5 text-[10px] text-white hover:bg-rose-500"
+                    onClick={() => {
+                      void window.watcher.settings.clearStats().then(() => {
+                        setConfirmWipe(false);
+                        setNote('statistics cleared');
+                      });
+                    }}
+                  >
+                    Delete 30 days — sure?
+                  </button>
+                  <button
+                    type="button"
+                    className="no-drag rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400"
+                    onClick={() => setConfirmWipe(false)}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="no-drag rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-rose-300"
+                  onClick={() => setConfirmWipe(true)}
+                >
+                  Clear statistics
+                </button>
+              )}
+            </div>
+          </Group>
+
+          <Group title="About">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] text-zinc-300">Sidelong</span>
+              <span className="font-mono text-[11px] tabular-nums text-zinc-500">v{cfg.version}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[10.5px] text-zinc-500">Listening on</span>
+              <span className="font-mono text-[10.5px] text-zinc-500">127.0.0.1:{cfg.port}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[10.5px] text-zinc-500">Shortcut</span>
+              <span className="font-mono text-[10.5px] text-zinc-500">{cfg.shortcut}</span>
+            </div>
+            <p className="text-[9.5px] leading-relaxed text-zinc-600">
+              Port and shortcut are still edited in config.json. The port because every installed
+              hook points at it and moving it needs a restart; the shortcut because capturing a
+              chord safely is a job of its own.
+            </p>
+          </Group>
         </>
       )}
     </div>

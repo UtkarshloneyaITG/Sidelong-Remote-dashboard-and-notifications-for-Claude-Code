@@ -500,6 +500,21 @@ shows has a shape you already recognise.
 
 ## Configuration
 
+**Most of this now has a UI.** Expand the bar → **Settings**:
+
+| Section | What you can change |
+|---|---|
+| **Hooks** | Install / remove for all projects or this project only, with live status, drift and the exact settings file path |
+| **Permission decisions** | Turn **Allow / Deny** on or off, and set the decision window. Changing either **rewrites the installed hooks for you** — the timeout lives inside them, so it would otherwise drift the moment you touched it |
+| **Behaviour** | Desktop notifications, start with Windows, stale threshold, auto-collapse delay |
+| **Data** | Debug log, open the data folder, clear the 30 days behind Analysis (confirms first) |
+| **About** | Version, listening address, current shortcut |
+
+Two settings are still file-only, on purpose: **`port`**, because every installed
+hook points at it and a listening socket cannot move without a restart — the panel
+says so rather than appearing to have worked — and **`shortcut`**, because
+capturing a chord safely is a job of its own.
+
 No environment variables, no `.env`. One JSON file, created on first launch:
 
 | OS | Path |
@@ -516,6 +531,7 @@ No environment variables, no `.env`. One JSON file, created on first launch:
 | `staleMs` | `90000` | Silence after which a working session dims. **Never changes its status.** |
 | `completedDismissMs` | `20000` | How long a completed turn stays expanded. `0` disables. |
 | `debugLog` | `false` | Opt-in local logging of event **names only**, never payloads. Off by default. |
+| `notifications` | `true` | Desktop toasts. Off still leaves the bar working — it just stops interrupting you. |
 | `permissionDecisions` | `false` | Enable **Allow / Deny**. Changing it requires reinstalling the hooks. |
 | `decisionWindowMs` | `15000` | How long a prompt may be held. The longest this app can ever stall one tool call. |
 | `barWidth` | `560` | Capsule width, remembered from the left-edge grip. Height is fixed. |

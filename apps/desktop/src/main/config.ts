@@ -33,6 +33,14 @@ export interface AppConfig {
   /** Opt-in, local-only debug log. Off by default: payloads are sensitive. */
   debugLog: boolean;
   /**
+   * Desktop notifications for the states worth interrupting you over.
+   *
+   * On by default, because a permission prompt that nobody sees is the entire
+   * problem this app exists to solve. Off still leaves the bar itself working --
+   * it just stops raising a toast over whatever you are doing.
+   */
+  notifications: boolean;
+  /**
    * Let the overlay ANSWER permission prompts with Allow / Deny.
    *
    * OFF by default, deliberately. It changes what this app is: a watcher becomes
@@ -74,6 +82,7 @@ const DEFAULTS: Omit<AppConfig, 'token'> = {
   staleMs: 90_000,
   completedDismissMs: 20_000,
   debugLog: false,
+  notifications: true,
   permissionDecisions: false,
   decisionWindowMs: 15_000,
   expanded: false,

@@ -9,6 +9,57 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **A settings panel**, replacing the hooks-only dialog. Hooks moved into it as one
+  section; the rest was previously a JSON file you edited by hand and restarted.
+
+  | Section | Controls |
+  |---|---|
+  | Hooks | install / remove per scope, live status, drift, real paths |
+  | Permission decisions | Allow/Deny on-off, decision window |
+  | Behaviour | desktop notifications, start with Windows, stale threshold, auto-collapse |
+  | Data | debug log, open data folder, clear statistics |
+  | About | version, listening address, shortcut |
+
+  The panel owns the **consequences** of a change rather than leaving them to
+  drift detection. Turning decisions on or moving the window **rewrites the
+  installed hooks in place**, because the timeout is baked into them and would
+  otherwise go stale the moment you touched the setting. Changing the port says
+  plainly that it needs a restart instead of appearing to have worked, measured
+  against the port actually bound rather than the one in the file.
+
+  Two settings stay file-only and the panel says why: `port` (a listening socket
+  cannot move, and every hook points at it) and `shortcut` (capturing a chord
+  safely is its own job).
+
+- **Desktop notifications can be turned off.** On by default — a permission prompt
+  nobody sees is the problem this app exists for — but off is now one click, and
+  it leaves the bar itself working. Gated at the call site rather than inside the
+  notifier, so switching them back on does not fire a backlog of toasts for things
+  that happened while they were off.
+
+### Fixed
+
+- **Allow / Deny lingered after you answered in VS Code.** The buttons kept
+  counting down for the rest of the decision window — up to fifteen seconds
+  offering to decide something already decided.
+
+  There is no hook for "approved"; permission grants are silent, measured, and
+  that is the limitation this whole app is built around. But the tool then *runs*,
+  `PostToolUse` arrives, and the reducer clears the prompt. That clearing is the
+  evidence. Main now settles any held prompt whose session has stopped pending,
+  with "no decision" — the right answer to a question nobody is asking any more.
+
+  `res.on('close')` did not already cover it: Claude Code keeps the connection
+  open after its own prompt is answered, so nothing fired. Measured against the
+  running app with a 15s window: hold open at 3s, released **2.88s** later the
+  instant `PostToolUse` landed.
+
+---
+
 ## [1.0.0] — 2026-08-10
 
 The version number is a **licence boundary**, not a claim that the code changed

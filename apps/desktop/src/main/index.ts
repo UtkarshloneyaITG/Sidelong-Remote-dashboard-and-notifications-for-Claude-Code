@@ -23,7 +23,7 @@ import {
 } from '@sidelong/protocol';
 import { AdapterRegistry, ClaudeCodeAdapter } from '@sidelong/agent-adapters';
 
-import { DEFAULT_PORT, loadConfig, updateConfig } from './config.js';
+import { DEFAULT_PORT, loadConfig, updateConfig, type AppConfig } from './config.js';
 import { IngestServer, PortInUseError, type Decision } from './ingest.js';
 import { BridgeServer } from './bridge-server.js';
 import { Notifier } from './notifier.js';
@@ -150,6 +150,8 @@ let tray: Tray | undefined;
 let collapseTimer: NodeJS.Timeout | undefined;
 let graceTimer: NodeJS.Timeout | undefined;
 let hookMessage: string | undefined;
+/** The port the receiver is actually listening on, set once it has bound. */
+let runningPort: number | undefined;
 /**
  * sessionId -> the permission key you clicked [ok] on. Lives in MAIN, not the
  * renderer, and is never fed back into the reducer: acknowledging is a display
@@ -567,7 +569,10 @@ function pushView(): void {
   const view = currentView();
   accruePrompts(view);
   win?.webContents.send('view', { ...view, expanded: loadConfig().expanded });
-  notifier?.update(view);
+  // Gated here rather than inside Notifier: the notifier still tracks state, so
+  // switching notifications back on does not fire a backlog of toasts for things
+  // that happened while they were off.
+  if (loadConfig().notifications) notifier?.update(view);
   refreshTray(view);
 
   // A prompt inside its grace window becomes actionable on a clock, not on an
@@ -649,6 +654,10 @@ async function startServers(): Promise<void> {
 
   try {
     await ingest.listen();
+    // The port actually BOUND, which is what every installed hook is pointing
+    // at. Changing the setting cannot move a listening socket, so this is what
+    // "restart required" is measured against.
+    runningPort = cfg.port;
   } catch (err) {
     if (err instanceof PortInUseError) return void portInUse(err.port);
     throw err;
@@ -930,6 +939,109 @@ function registerIpc(): void {
       return { ok: false, reason: 'bad behavior' };
     }
     return { ok: decide(sessionId, behavior) };
+  });
+
+  /**
+   * Everything the settings panel can read. Deliberately NOT the whole config:
+   * `token` is a secret and `bounds`/`expanded` are window state, not settings.
+   */
+  ipcMain.handle('settings:get', () => {
+    const cfg = loadConfig();
+    return {
+      port: cfg.port,
+      shortcut: cfg.shortcut,
+      staleMs: cfg.staleMs,
+      completedDismissMs: cfg.completedDismissMs,
+      debugLog: cfg.debugLog,
+      notifications: cfg.notifications,
+      permissionDecisions: cfg.permissionDecisions,
+      decisionWindowMs: cfg.decisionWindowMs,
+      openAtLogin: startsWithWindows(),
+      version: app.getVersion(),
+      dataDir: app.getPath('userData'),
+      /** Set while the running process differs from what is saved. */
+      restartRequired: cfg.port !== runningPort,
+    };
+  });
+
+  /**
+   * Apply a settings patch, and deal with what each change actually costs.
+   *
+   * Three of these are not just a value in a file:
+   *
+   *  - `permissionDecisions` and `decisionWindowMs` are baked into the installed
+   *    hook's timeout, so every scope that is currently installed gets rewritten
+   *    here. Leaving that to drift detection would mean telling the user to go
+   *    and fix something the app could simply do.
+   *  - `port` is written into every installed hook AND the bridge, so it cannot
+   *    take effect until a restart. Saved, flagged, and not pretended otherwise.
+   *  - `openAtLogin` is an OS setting, not ours.
+   */
+  ipcMain.handle('settings:set', (_e, patch: unknown) => {
+    const p = (patch ?? {}) as Record<string, unknown>;
+    const num = (v: unknown, lo: number, hi: number): number | undefined =>
+      typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : undefined;
+
+    const before = loadConfig();
+    const next: Partial<AppConfig> = {};
+
+    if (typeof p.debugLog === 'boolean') next.debugLog = p.debugLog;
+    if (typeof p.notifications === 'boolean') next.notifications = p.notifications;
+    if (typeof p.permissionDecisions === 'boolean') next.permissionDecisions = p.permissionDecisions;
+    const window = num(p.decisionWindowMs, 3_000, 60_000);
+    if (window !== undefined) next.decisionWindowMs = window;
+    const stale = num(p.staleMs, 15_000, 600_000);
+    if (stale !== undefined) next.staleMs = stale;
+    const dismiss = num(p.completedDismissMs, 0, 300_000);
+    if (dismiss !== undefined) next.completedDismissMs = dismiss;
+    const port = num(p.port, 1_024, 65_535);
+    if (port !== undefined) next.port = port;
+
+    if (Object.keys(next).length) updateConfig(next);
+
+    if (typeof p.openAtLogin === 'boolean') {
+      app.setLoginItemSettings({ openAtLogin: p.openAtLogin, path: process.execPath });
+    }
+
+    // Hooks carry the decision timeout, so a change here invalidates them.
+    const cfg = loadConfig();
+    const decisionsChanged = cfg.permissionDecisions !== before.permissionDecisions
+      || cfg.decisionWindowMs !== before.decisionWindowMs;
+    let reinstalled: hooks.HookScope[] = [];
+    if (decisionsChanged) {
+      const current = hooks.overallStatus(cfg.port, cfg.token, decisionWindow());
+      reinstalled = (['user', 'project'] as const).filter((s) => current[s].installed);
+      for (const scope of reinstalled) {
+        hooks.install(scope, cfg.port, cfg.token, undefined, decisionWindow());
+      }
+      refreshHookStatus();
+    }
+
+    pushView();
+    return {
+      ok: true,
+      reinstalled,
+      restartRequired: cfg.port !== runningPort,
+    };
+  });
+
+  /** Wipe the 30 days behind Analysis. Destructive, so the UI confirms first. */
+  ipcMain.handle('settings:clear-stats', () => {
+    blockedByDay = {};
+    countsByDay = {};
+    commandsByDay = {};
+    lastBlockedSeen.clear();
+    statsDirty = true;
+    saveStats();
+    pushView();
+    return { ok: true };
+  });
+
+  /** Open the folder holding config.json and stats.json. Reveals, never reads. */
+  ipcMain.handle('settings:open-data-dir', async () => {
+    const dir = app.getPath('userData');
+    const err = await shell.openPath(dir);
+    return { ok: !err, dir, error: err || undefined };
   });
 
   ipcMain.handle('hooks:status', () => {
