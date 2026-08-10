@@ -44,3 +44,40 @@ jobs:
             release/Sidelong-Setup-*.exe
             release/Sidelong-*-portable.exe
             extensions/vscode-bridge/sidelong-claude-status-bar.vsix
+
+  # Separate job because Linux artifacts need a Linux runner -- electron-builder
+  # cannot produce an AppImage or a .deb from Windows. It attaches to the same
+  # release; whichever job finishes second adds its files to it.
+  #
+  # These builds are UNVERIFIED: nobody has confirmed always-on-top, tray or
+  # notification behaviour on a Linux desktop. Shipped so they can be, and said
+  # plainly in the README rather than implied by their existence.
+  linux:
+    name: Build Linux binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Package AppImage + deb
+        run: npm run dist -w @sidelong/desktop
+
+      - name: Attach artifacts to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          files: |
+            release/Sidelong-*.AppImage
+            release/Sidelong-*.deb

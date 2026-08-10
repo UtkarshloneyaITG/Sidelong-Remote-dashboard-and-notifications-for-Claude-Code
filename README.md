@@ -200,7 +200,20 @@ state, no duplication.
 |---|---|
 | **[Sidelong-Setup-x.y.z.exe](https://github.com/gamith24/sidelong-claude-code-status-bar/releases/latest)** | Windows installer. Start-menu entry, per-user, no admin. |
 | **[Sidelong-x.y.z-portable.exe](https://github.com/gamith24/sidelong-claude-code-status-bar/releases/latest)** | Single file, run it from anywhere. Nothing installed. |
+| **[Sidelong-x.y.z-x64.AppImage](https://github.com/gamith24/sidelong-claude-code-status-bar/releases/latest)** | Linux. `chmod +x` it and run. **Unverified — see below.** |
+| **[Sidelong-x.y.z-x64.deb](https://github.com/gamith24/sidelong-claude-code-status-bar/releases/latest)** | Debian / Ubuntu package. **Unverified — see below.** |
 | **[sidelong-claude-status-bar.vsix](https://github.com/gamith24/sidelong-claude-code-status-bar/releases/latest)** | Optional VS Code extension. |
+
+> [!NOTE]
+> **Linux works too.** Take the **AppImage** (`chmod +x`, then run) or the
+> **`.deb`**. Both are built on a Linux runner by the same workflow that builds
+> the Windows binaries, and gated on the same typecheck and test suite.
+>
+> They have not been **verified running** on a Linux desktop yet. The code is
+> portable — no Win32 APIs, no shelling out — and CI compiles and tests it on
+> Ubuntu for every commit, but always-on-top behaviour, the tray icon and desktop
+> notifications are specific to your desktop environment and have only ever been
+> confirmed on Windows 11. Please say what happens.
 
 > [!NOTE]
 > The binaries are **unsigned** — a code-signing certificate costs a few hundred
@@ -514,6 +527,19 @@ Two settings are still file-only, on purpose: **`port`**, because every installe
 hook points at it and a listening socket cannot move without a restart — the panel
 says so rather than appearing to have worked — and **`shortcut`**, because
 capturing a chord safely is a job of its own.
+
+> [!NOTE]
+> **The settings panel owns the consequences of a change, not just the value.**
+>
+> Turning **Allow / Deny** on, or moving the **decision window**, rewrites your
+> installed hooks in place. The timeout is baked into the hook entries themselves,
+> so a setting that only wrote to a file would silently invalidate your hooks and
+> then report drift at you afterwards. The panel reinstalls them and names the
+> scopes it touched.
+>
+> **Debug log** is the one to be careful with: it records hook payloads, and those
+> carry whole file contents and full command strings. It is off by default for
+> that reason, and worth switching back off once you have what you needed.
 
 No environment variables, no `.env`. One JSON file, created on first launch:
 

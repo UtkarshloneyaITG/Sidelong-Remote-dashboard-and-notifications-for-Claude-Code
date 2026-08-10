@@ -32,7 +32,7 @@
   "@type": "SoftwareApplication",
   "name": "Sidelong",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Windows 11",
+  "operatingSystem": ["Windows", "Linux"],
   "description": "An always-on-top status bar showing the live state of every Claude Code session, driven by Claude Code's HTTP hook system. Surfaces permission prompts that would otherwise wait silently.",
   "url": "https://gamith24.github.io/sidelong-claude-code-status-bar/",
   "codeRepository": "https://github.com/gamith24/sidelong-claude-code-status-bar",
@@ -85,6 +85,7 @@
   <a href="#states">States</a>
   <a href="#how">How it works</a>
   <a href="#analysis">Analysis</a>
+  <a href="#settings">Settings</a>
   <a href="install.html">Install</a>
   <a href="capabilities.html">Capabilities</a>
   <a href="https://github.com/gamith24/sidelong-claude-code-status-bar">GitHub&nbsp;↗</a>
@@ -147,7 +148,7 @@
     Windows and macOS. No account, no API key, nothing to configure before it runs.
   </p>
 
-  <div class="grid grid--3">
+  <div class="grid grid--2">
     <div class="cell">
       <span class="cell__n">Recommended</span>
       <h3>Installer</h3>
@@ -167,6 +168,18 @@
       </p>
     </div>
     <div class="cell">
+      <span class="cell__n">Linux</span>
+      <h3>Ubuntu &amp; friends</h3>
+      <p>An <strong>AppImage</strong> you can <code>chmod +x</code> and run, or a
+      <strong>.deb</strong> if you would rather it be managed. Built on a Linux runner.</p>
+      <p style="margin-top:14px">
+        <a class="btn btn--ghost" id="dl-appimage"
+           href="https://github.com/gamith24/sidelong-claude-code-status-bar/releases/latest">AppImage</a>
+        <a class="btn btn--ghost" id="dl-deb" style="margin-left:8px"
+           href="https://github.com/gamith24/sidelong-claude-code-status-bar/releases/latest">.deb</a>
+      </p>
+    </div>
+    <div class="cell">
       <span class="cell__n">Optional</span>
       <h3>VS Code bridge</h3>
       <p>Focus-aware notifications, git branch and diagnostics. Not required.</p>
@@ -177,7 +190,15 @@
     </div>
   </div>
 
-  <div class="note" style="margin-top:26px">
+  <div class="note note--warn" style="margin-top:26px">
+    <p><strong>The Linux builds have not been verified running.</strong> The code is portable —
+    no Win32 APIs, no shelling out — and CI builds and tests it on Ubuntu for every commit. But
+    always-on-top behaviour, the tray icon and desktop notifications are specific to your desktop
+    environment, and those have only ever been confirmed on Windows 11. They are published so
+    they can be tested; please say what happens.</p>
+  </div>
+
+  <div class="note" style="margin-top:14px">
     <p><strong>The binaries are unsigned.</strong> A code-signing certificate costs
     hundreds a year, so Windows SmartScreen will say “Windows protected your PC” the first
     time — choose <strong>More info → Run anyway</strong>. If you would rather not trust a
@@ -433,8 +454,112 @@ S   = Δ × n_B         <span class="c"># total saved over the range</span></cod
   </div>
 </section>
 
+<section id="settings">
+  <p class="eyebrow">06 — Settings</p>
+  <h2>Everything it does, <em>where you can see it</em>.</h2>
+  <p>
+    Expand the bar and press <strong>Settings</strong>. Most of this used to be a JSON file you
+    edited by hand and then restarted the app; it is all here now, and each change takes effect
+    immediately unless the panel tells you otherwise.
+  </p>
+
+  <h3>Hooks</h3>
+  <p>
+    Install or remove Sidelong's hooks, for <strong>all projects</strong> (your user settings) or
+    <strong>this project only</strong>. Shows live status, the exact settings file being written,
+    and a warning if the installed hooks have <strong>drifted</strong> from what this version
+    expects — which is what happens if you change a setting that is baked into them.
+  </p>
+
+  <h3>Permission decisions</h3>
+  <table>
+    <thead><tr><th>Setting</th><th>Default</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Answer prompts from the bar</strong></td>
+        <td>Off</td>
+        <td>Adds <strong>Allow</strong> and <strong>Deny</strong>. This changes what the app <em>is</em> — a watcher gains the ability to approve a command — which is why it is off until you ask for it.</td>
+      </tr>
+      <tr>
+        <td><strong>Decision window</strong></td>
+        <td>15 s</td>
+        <td>How long a prompt may be held open waiting for your click. This is the longest Sidelong can ever stall one tool call. When it lapses, Claude Code prompts you normally and nothing is lost.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note note--warn">
+    <p><strong>Both of these rewrite your installed hooks.</strong> The decision timeout lives
+    inside the hook entries themselves, so changing either setting would otherwise leave your
+    hooks stale the moment you touched it. The panel reinstalls them for you and says which
+    scopes it touched. There is also a cost while a decision is outstanding: the tool call is
+    blocked and <em>VS Code's own prompt does not appear</em>, so ignoring the bar delays the
+    normal prompt by up to the window you set.</p>
+  </div>
+
+  <h3>Behaviour</h3>
+  <table>
+    <thead><tr><th>Setting</th><th>Default</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Desktop notifications</strong></td>
+        <td>On</td>
+        <td>A toast when a session needs you, finishes, or fails. Off leaves the bar working — it just stops interrupting whatever is in front of you.</td>
+      </tr>
+      <tr>
+        <td><strong>Start with Windows</strong></td>
+        <td>Off</td>
+        <td>Launch Sidelong at login.</td>
+      </tr>
+      <tr>
+        <td><strong>Call it stale after</strong></td>
+        <td>90 s</td>
+        <td>How long silence lasts before the bar stops claiming Claude is working and says how long it has been instead. It <em>never</em> changes the status — only what it admits to knowing.</td>
+      </tr>
+      <tr>
+        <td><strong>Collapse when done after</strong></td>
+        <td>20 s</td>
+        <td>How long a finished turn stays expanded before returning to the capsule. 0 keeps it open until you close it.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Data</h3>
+  <table>
+    <thead><tr><th>Setting</th><th>Default</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Write a debug log</strong></td>
+        <td>Off</td>
+        <td>Records every hook event to disk, <strong>including tool inputs</strong> — which carry whole file contents and full command strings. Off by default for exactly that reason. Turn it on while chasing something, then turn it off.</td>
+      </tr>
+      <tr>
+        <td><strong>Open folder</strong></td>
+        <td>—</td>
+        <td>Reveals where <code>config.json</code> and <code>stats.json</code> live. Nothing here is ever uploaded.</td>
+      </tr>
+      <tr>
+        <td><strong>Clear statistics</strong></td>
+        <td>—</td>
+        <td>Deletes the 30 days behind the Analysis panel. Asks once before it does.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Still edited by hand</h3>
+  <p>
+    Two settings stay in <code>config.json</code>, and the panel says so rather than pretending:
+  </p>
+  <table>
+    <thead><tr><th>Setting</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><code>port</code></td><td>Every installed hook points at it, and a listening socket cannot be moved without a restart. Change it and the panel tells you a restart is needed instead of appearing to have worked.</td></tr>
+      <tr><td><code>shortcut</code></td><td>Capturing a keyboard chord safely — and checking the OS will actually grant it — is a job of its own. The default <code>Ctrl+Shift+Space</code> collides with VS Code's Trigger Parameter Hints; <code>Ctrl+Alt+Space</code> is unbound on a stock setup.</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <section id="start">
-  <p class="eyebrow">06 — Quick start</p>
+  <p class="eyebrow">07 — Quick start</p>
   <h2>Four commands.</h2>
 <pre><code>npm install &amp;&amp; npm run build
 npm start                                  <span class="c"># launch the bar</span>
@@ -452,7 +577,7 @@ node tools/install-hooks.mjs status        <span class="c"># confirm</span></cod
 </section>
 
 <section id="honest">
-  <p class="eyebrow">07 — Limits</p>
+  <p class="eyebrow">08 — Limits</p>
   <h2>What it <em>can't</em> do.</h2>
   <p>
     A limitation documented is worth more than a capability faked. The full ledger classifies
@@ -514,11 +639,15 @@ node tools/install-hooks.mjs status        <span class="c"># confirm</span></cod
       var setup = find(/Setup.*\.exe$/i);
       var portable = find(/portable\.exe$/i);
       var vsix = find(/\.vsix$/i);
+      var appimage = find(/\.AppImage$/i);
+      var deb = find(/\.deb$/i);
 
       set('dl-main', setup || portable);
       set('dl-setup', setup);
       set('dl-portable', portable);
       set('dl-vsix', vsix);
+      set('dl-appimage', appimage);
+      set('dl-deb', deb);
 
       if (meta && (setup || portable)) {
         var a = setup || portable;

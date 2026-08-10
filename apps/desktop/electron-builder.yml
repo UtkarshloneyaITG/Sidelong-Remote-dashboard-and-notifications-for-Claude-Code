@@ -47,5 +47,29 @@ nsis:
 portable:
   artifactName: Sidelong-${version}-portable.${ext}
 
+# Linux, built on a Linux runner. Windows .exe files are not runnable on Linux --
+# double-clicking one on Ubuntu hands it to Archive Manager, which reports "an
+# error occurred while loading the archive", because an NSIS installer IS a
+# self-extracting archive it half-recognises and cannot open.
+#
+# AppImage first: one file, chmod +x, run. deb for people who want it managed.
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  category: Development
+  synopsis: Status bar for Claude Code
+  description: >-
+    An always-on-top bar showing the live state of every Claude Code session --
+    what it is running, what it changed, and when it is silently waiting on a
+    permission prompt. Driven by Claude Code's hook system, entirely local.
+  icon: resources/icon.png
+  artifactName: Sidelong-${version}-${arch}.${ext}
+
+appImage:
+  artifactName: Sidelong-${version}-${arch}.${ext}
+
 # Unsigned. Windows SmartScreen will warn on first run; see the README.
 forceCodeSigning: false

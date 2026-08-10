@@ -732,7 +732,7 @@ function Seconds({ label, note, value, min, max, step = 1, onCommit }: {
  * because the timeout lives inside them, and changing the port says plainly that
  * it needs a restart instead of appearing to have worked.
  */
-function Setup({ onClose }: { onClose: () => void }): JSX.Element {
+function Settings({ onClose }: { onClose: () => void }): JSX.Element {
   const [status, setStatus] = useState<HookStatusPayload | null>(null);
   const [cfg, setCfg] = useState<SettingsPayload | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -1191,7 +1191,7 @@ function ConnectionRow({ view, onFix }: { view: RendererView; onFix: () => void 
 
 export default function App(): JSX.Element {
   const [view, setView] = useState<RendererView | null>(null);
-  const [setupOpen, setSetupOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [openHint, openEditor] = useOpenEditor();
   const cornerGrip = useGrip('corner');
@@ -1321,9 +1321,9 @@ export default function App(): JSX.Element {
           <button
             type="button"
             className="no-drag rounded border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-200"
-            onClick={() => setSetupOpen(true)}
+            onClick={() => setSettingsOpen(true)}
           >
-            Hooks
+            Settings
           </button>
           <button
             type="button"
@@ -1342,8 +1342,8 @@ export default function App(): JSX.Element {
           </button>
         </div>
 
-        <ConnectionRow view={view} onFix={() => setSetupOpen(true)} />
-        {setupOpen && <Setup onClose={() => setSetupOpen(false)} />}
+        <ConnectionRow view={view} onFix={() => setSettingsOpen(true)} />
+        {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
         {analysisOpen && <Analysis onClose={() => setAnalysisOpen(false)} />}
       </div>
 
