@@ -192,6 +192,18 @@ state, no duplication.
 > runners, so you can check exactly what produced the file you downloaded — or build
 > it yourself with `npm run dist -w @agent-watcher/desktop`.
 
+**Upgrading is the same file.** Download the new `Setup.exe` and run it — its first page
+reads what you already have and says which of the three things is about to happen:
+
+| Already installed | The installer says |
+|---|---|
+| Nothing | **Install Sidelong 0.1.7** |
+| An older version | **Update Sidelong** — *"Version 0.1.6 is installed. This will update it to 0.1.7."* |
+| The same version | **Reinstall Sidelong 0.1.7** — *"…already installed. Continuing reinstalls the same version over it."* |
+
+Your config, hooks and 30 days of statistics survive all three; nothing is overwritten but
+the program itself. Close Sidelong before updating so the running exe is not locked.
+
 After installing, launch it and use the **Hooks** panel inside the app (expand the bar →
 **Hooks** → **Install**) — no clone needed. From a clone you can instead run
 `node tools/install-hooks.mjs install`.

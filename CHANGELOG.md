@@ -9,6 +9,53 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **The installer says whether it is installing, updating or reinstalling.** Running
+  `Setup.exe` over an existing copy previously opened a wizard that said "Install",
+  with nothing anywhere to say a version was already there or what would happen to
+  it. A first page now reads the installed version and names both:
+
+  | Already installed | The wizard says |
+  |---|---|
+  | Nothing | *Install Sidelong 0.1.7* |
+  | An older version | *Update Sidelong — version 0.1.6 is installed. This will update it to 0.1.7.* |
+  | The same version | *Reinstall Sidelong 0.1.7 — …continuing reinstalls the same version over it.* |
+
+  All three verified by building the installer and reading the live wizard's control
+  text. Three things had to be got right, each of which failed first:
+
+  - The check is a **registry read, not electron-builder's `${isUpdated}`** — that flag
+    means "launched by the auto-updater", which is false in exactly the case that
+    matters (you downloaded the exe and double-clicked it).
+  - It reads **HKCU then HKLM explicitly, not `SHELL_CONTEXT`**. The welcome page is the
+    first page, so it runs before the install-mode page sets that context: the read
+    silently found nothing for a per-user install and the page cheerfully offered to
+    "Install" over the top of one.
+  - It runs on MUI's **`SHOW` callback, not `PRE`**. `PRE` fires before the page's
+    controls exist, so `SendMessage` had nothing to write to and the compile-time text
+    was drawn regardless.
+
+- **A trend against the previous window** in Analysis: "12m, down 58% vs prev 7d",
+  comparing the range against the same range immediately before it. Shown only when
+  the whole previous window is inside the retained 30 days and is non-zero, so the
+  30-day view never shows one.
+
+- **"Keeps asking about"** in Analysis: prompts grouped by what they were about, most
+  asked first — the one statistic here you can act on, since anything you always
+  approve belongs in your permission allowlist instead.
+
+  That key is written to disk and kept 30 days, which nothing else derived from a tool
+  input is, so it takes only a program name plus one subcommand for tools where the
+  subcommand is the verb (`npm test`, `git push`), each of which must be a bare word.
+  Writing the test first paid for itself: the first version split on whitespace, which
+  tears a quoted path in half — `"/opt/my tools/run.sh"` produced the key `my`, a
+  fragment of somebody's directory.
+
+---
+
 ## [0.1.7] — 2026-08-10
 
 ### Added

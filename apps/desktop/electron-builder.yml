@@ -28,6 +28,9 @@ win:
 nsis:
   oneClick: false
   perMachine: false
+  # Adds a first page that says whether this is an install, an update or a
+  # reinstall, and names both versions. Picked up from buildResources above.
+  include: resources/installer.nsh
   allowToChangeInstallationDirectory: true
   artifactName: Sidelong-Setup-${version}.${ext}
   # Shortcuts the installer CAN create. Windows deliberately offers no API for
