@@ -1,6 +1,6 @@
 {
   "name": "@agent-watcher/desktop",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "The always-on-top overlay: hook receiver, state machine host, and UI.",
   "license": "MIT",
