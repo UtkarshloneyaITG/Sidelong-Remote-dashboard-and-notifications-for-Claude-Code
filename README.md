@@ -739,6 +739,8 @@ commercially without a licence.
 
 The name and logo are handled separately — see [`TRADEMARK.md`](TRADEMARK.md). A
 code licence governs copying the software; it grants no right to the name.
+Copyright, licensing and trademark authority are held by `gamith24` — see
+[`NOTICE.md`](NOTICE.md).
 
 No warranty is given: if it breaks, you keep both pieces. Worth noting that the
 one failure mode people actually care about here is covered by design rather than

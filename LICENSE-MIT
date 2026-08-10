@@ -9,13 +9,17 @@ keep using it under the MIT terms below, permanently, including commercially.
 This file exists so that boundary is stated rather than inferred from the absence
 of a file.
 
-The released versions carried these copyright notices:
+OWNERSHIP
+---------
 
-    v0.1.0 - v0.1.8    Copyright (c) 2026 UtkarshloneyaITG
-    v0.1.9             Copyright (c) 2026 gamith24
+All copyright and licensing authority for this project, including for the
+MIT-licensed versions below, is held by gamith24.
 
-(The project moved to a new owner between v0.1.8 and v0.1.9. Both notices are
-recorded because each is what the corresponding release actually shipped with.)
+Releases v0.1.0 through v0.1.8 were published while the project was hosted under
+a previous account, and the copies distributed at that time carry a copyright
+notice naming `UtkarshloneyaITG`. Those artifacts are unchanged and their notices
+remain as published — that is a matter of record, not a competing claim. The
+holder is gamith24.
 
 The text below is verbatim MIT, unmodified.
 
@@ -23,7 +27,6 @@ The text below is verbatim MIT, unmodified.
 
 MIT License
 
-Copyright (c) 2026 UtkarshloneyaITG
 Copyright (c) 2026 gamith24
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
