@@ -9,6 +9,33 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [1.1.1] — 2026-08-10
+
+### Fixed
+
+- **The Linux build failed the first time it ever ran**, so v1.1.0 shipped Windows
+  binaries only. On Linux, electron-builder derives the executable name from the
+  package `name`, and ours is scoped: `@sidelong/desktop` collapses to
+  `@sidelongdesktop`, which contains a character it refuses to put in a file path.
+
+  ```
+  ⨯ failed to build AppImage
+    error=executableName contains characters that cannot be safely used
+    in file paths: @sidelongdesktop
+  ```
+
+  Windows never hit it because it uses `productName` instead — which is exactly
+  why a Windows-only release pipeline could not have caught this. Fixed by setting
+  `linux.executableName` explicitly.
+
+- **The window would not have been associated with its launcher entry.** The same
+  build warned that `desktopName` was unset, which leaves `app_id` / `WM_CLASS`
+  unlinked from the `.desktop` file. That matters more here than for an ordinary
+  app: this window is always-on-top, and window-manager rules are exactly how a
+  Linux user would tame it. Set `desktopName` and `syncDesktopName`.
+
+---
+
 ## [1.1.0] — 2026-08-10
 
 ### Added
@@ -576,6 +603,7 @@ See [docs/CAPABILITIES.md](docs/CAPABILITIES.md). The significant ones: permissi
 during model inference; and macOS and Linux build in CI but their overlay
 behaviour is untested.
 
+[1.1.1]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.1
 [1.1.0]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.0
 [1.0.0]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.0.0
 [0.1.9]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v0.1.9

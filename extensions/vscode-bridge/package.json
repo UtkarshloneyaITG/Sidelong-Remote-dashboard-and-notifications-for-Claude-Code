@@ -6,7 +6,7 @@
   "// keywords": "The searchable surface. The product name is distinctive on purpose; the words people actually type go here and in the description, not in the name.",
   "keywords": ["claude", "claude code", "status bar", "agent", "overlay", "permission prompt"],
   "license": "SEE LICENSE IN LICENSE",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "publisher": "sidelong",
   "engines": {

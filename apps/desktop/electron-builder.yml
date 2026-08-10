@@ -59,6 +59,17 @@ linux:
       arch: [x64]
     - target: deb
       arch: [x64]
+  # REQUIRED, and the reason the first Linux build failed. On Linux
+  # electron-builder derives the binary name from the package `name`, and ours is
+  # scoped -- "@sidelong/desktop" collapses to "@sidelongdesktop", which contains
+  # a character it refuses to put in a file path. Windows never hit this because
+  # it uses productName instead.
+  executableName: sidelong
+  # Ties the running window to the .desktop entry via app_id / WM_CLASS. Without
+  # it a desktop environment cannot associate the two -- which matters more here
+  # than for a normal app, because this window is always-on-top and users will
+  # want window-manager rules to find it.
+  syncDesktopName: true
   category: Development
   synopsis: Status bar for Claude Code
   description: >-
