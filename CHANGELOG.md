@@ -9,9 +9,23 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
-## [Unreleased]
+## [1.1.0] — 2026-08-10
 
 ### Added
+
+- **Linux builds: AppImage and `.deb`.** Prompted by a real report — running the
+  Windows installer on Ubuntu produces *"an error occurred while loading the
+  archive"*, which is Archive Manager being handed an NSIS self-extracting archive
+  it half-recognises. The actual problem was that no Linux artifact existed.
+
+  Built by a second release job on `ubuntu-latest`, because electron-builder
+  cannot produce either format from a Windows runner. CI has always compiled and
+  tested on Ubuntu; only the *release* was Windows-only, which is why nothing
+  runnable ever reached the releases page.
+
+  **Not verified running.** Portable code and a green Ubuntu CI job prove it
+  compiles, not that always-on-top, the tray icon or notifications behave on a
+  given desktop environment. Published so that can be found out.
 
 - **A settings panel**, replacing the hooks-only dialog. Hooks moved into it as one
   section; the rest was previously a JSON file you edited by hand and restarted.
@@ -562,6 +576,7 @@ See [docs/CAPABILITIES.md](docs/CAPABILITIES.md). The significant ones: permissi
 during model inference; and macOS and Linux build in CI but their overlay
 behaviour is untested.
 
+[1.1.0]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.0
 [1.0.0]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.0.0
 [0.1.9]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v0.1.9
 [0.1.8]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v0.1.8
