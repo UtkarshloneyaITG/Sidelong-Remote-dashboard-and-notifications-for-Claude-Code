@@ -1,6 +1,6 @@
 {
   "name": "@sidelong/desktop",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "// desktopName": "The .desktop file name, used as app_id/WM_CLASS so a Linux desktop can link the running window to its launcher entry.",
   "desktopName": "sidelong.desktop",
   "private": true,
@@ -35,5 +35,10 @@
     "vite": "^7.0.0",
     "electron-builder": "^26.15.3"
   },
-  "author": "gamith24"
+  "homepage": "https://gamith24.github.io/sidelong-claude-code-status-bar/",
+  "// author": "The email is required by the .deb maintainer field. The GitHub noreply form is routable and keeps a personal address out of a public package.",
+  "author": {
+    "name": "gamith24",
+    "email": "153544310+gamith24@users.noreply.github.com"
+  }
 }

@@ -70,6 +70,10 @@ linux:
   # than for a normal app, because this window is always-on-top and users will
   # want window-manager rules to find it.
   syncDesktopName: true
+  # Debian will not build a package without a maintainer, and fpm reads it from
+  # the author field. Stated here as well so the requirement is visible at the
+  # place that needs it rather than only in package.json.
+  maintainer: gamith24 <153544310+gamith24@users.noreply.github.com>
   category: Development
   synopsis: Status bar for Claude Code
   description: >-

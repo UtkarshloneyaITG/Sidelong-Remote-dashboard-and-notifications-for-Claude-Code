@@ -9,6 +9,32 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [1.1.2] — 2026-08-11
+
+### Fixed
+
+- **The `.deb` had no Debian metadata**, so v1.1.1 still shipped Windows only —
+  even though the `executableName` fix worked and **the AppImage built cleanly**.
+  `fpm` refuses to package without a homepage and a maintainer address:
+
+  ```
+  ⨯ Please specify project homepage
+    Please specify author 'email' in the application package.json
+    It is required to set Linux .deb package maintainer.
+  ```
+
+  Added `homepage`, and an author with an address. The address is the GitHub
+  noreply form — routable, and it keeps a personal one out of a public package
+  that anybody can `dpkg -I`.
+
+- **A failed `.deb` threw away a working AppImage.** The two are independent
+  targets that failed independently, but one packaging error failed the whole job
+  before anything was attached, so the platform shipped nothing. The attach step
+  now runs regardless, publishing whatever actually built. The job still goes red,
+  so a failure is still a failure — it just stops being contagious.
+
+---
+
 ## [1.1.1] — 2026-08-10
 
 ### Fixed
@@ -603,6 +629,7 @@ See [docs/CAPABILITIES.md](docs/CAPABILITIES.md). The significant ones: permissi
 during model inference; and macOS and Linux build in CI but their overlay
 behaviour is untested.
 
+[1.1.2]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.2
 [1.1.1]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.1
 [1.1.0]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.1.0
 [1.0.0]: https://github.com/gamith24/sidelong-claude-code-status-bar/releases/tag/v1.0.0

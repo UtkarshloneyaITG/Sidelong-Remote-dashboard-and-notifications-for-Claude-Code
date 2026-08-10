@@ -73,7 +73,13 @@ jobs:
       - name: Package AppImage + deb
         run: npm run dist -w @sidelong/desktop
 
+      # `always()` on purpose. These are two independent targets, and v1.1.1
+      # proved they fail independently: the AppImage built cleanly and was then
+      # thrown away because the .deb could not find a Debian maintainer field.
+      # Attaching whatever exists means one broken target costs you that target,
+      # not the whole platform. The job still goes red, so nothing is hidden.
       - name: Attach artifacts to the release
+        if: always()
         uses: softprops/action-gh-release@v2
         with:
           draft: false
