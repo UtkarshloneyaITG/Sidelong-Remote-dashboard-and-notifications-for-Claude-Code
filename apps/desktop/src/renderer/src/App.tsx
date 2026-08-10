@@ -9,7 +9,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
-import type { OverlayView, SessionView, Severity } from '@agent-watcher/protocol';
+import {
+  MIN_SAMPLES, savings, trend,
+  type DayCounts, type OverlayView, type SessionView, type Severity,
+} from '@sidelong/protocol';
 
 type RendererView = OverlayView & { expanded: boolean };
 
@@ -38,16 +41,6 @@ declare global {
   }
 }
 
-interface DayCounts {
-  prompts: number;
-  answered: number;
-  answeredMs: number;
-  elsewhere: number;
-  elsewhereMs: number;
-  tools: number;
-  turns: number;
-  sessions: number;
-}
 
 interface StatsPayload {
   /** Oldest first, one row per local day, gaps filled with real zeroes. */
@@ -451,22 +444,6 @@ function dur(ms: number): string {
  * It returns null rather than a small number when either population is thin. A
  * "saving" computed from one sample of each is noise wearing a decimal point.
  */
-const MIN_SAMPLES = 3;
-function savings(rows: DayCounts[]): { perPrompt: number; total: number; answered: number; elsewhere: number } | null {
-  const t = rows.reduce(
-    (acc, c) => ({
-      answered: acc.answered + c.answered,
-      answeredMs: acc.answeredMs + c.answeredMs,
-      elsewhere: acc.elsewhere + c.elsewhere,
-      elsewhereMs: acc.elsewhereMs + c.elsewhereMs,
-    }),
-    { answered: 0, answeredMs: 0, elsewhere: 0, elsewhereMs: 0 },
-  );
-  if (t.answered < MIN_SAMPLES || t.elsewhere < MIN_SAMPLES) return null;
-  const perPrompt = t.elsewhereMs / t.elsewhere - t.answeredMs / t.answered;
-  if (perPrompt <= 0) return null;
-  return { perPrompt, total: perPrompt * t.answered, answered: t.answered, elsewhere: t.elsewhere };
-}
 
 /**
  * The same range again, immediately before it — so "12m" can become "12m, down
@@ -477,13 +454,6 @@ function savings(rows: DayCounts[]): { perPrompt: number; total: number; answere
  * days, and unless it is non-zero: a percentage against nothing is a division
  * by zero dressed as an insight.
  */
-function trend(all: StatsPayload['days'], range: number): { delta: number; prev: number } | null {
-  if (all.length < range * 2) return null;
-  const sum = (rows: StatsPayload['days']): number => rows.reduce((a, d) => a + d.blockedMs, 0);
-  const prev = sum(all.slice(-range * 2, -range));
-  if (prev <= 0) return null;
-  return { delta: (sum(all.slice(-range)) - prev) / prev, prev };
-}
 
 function Analysis({ onClose }: { onClose: () => void }): JSX.Element {
   const [stats, setStats] = useState<StatsPayload | null>(null);
@@ -596,9 +566,11 @@ function Analysis({ onClose }: { onClose: () => void }): JSX.Element {
               {saved.elsewhere} settled in VS Code instead.
             </p>
             <p className="mt-1.5 text-[9px] leading-relaxed text-zinc-600">
-              An estimate, not a measurement: the two groups are self-selected, not assigned, and a
-              grant in VS Code fires no hook, so its wait is read from the tool starting — tens of
-              ms late, which flatters this figure.
+              An estimate, not a measurement. Each prompt is credited once when it resolves and
+              never recounted, so this only ever grows. A prompt you answered slower than your VS
+              Code average counts zero, not a negative — a sum of savings, not a net. The groups
+              are self-selected rather than assigned, and a grant in VS Code fires no hook, so its
+              wait is read from the tool starting: tens of ms late, which flatters this figure.
             </p>
           </>
         ) : (
@@ -674,7 +646,7 @@ function Setup({ onClose }: { onClose: () => void }): JSX.Element {
       {status && (
         <>
           <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-400">
-            Agent Watcher listens on <span className="font-mono text-zinc-300">127.0.0.1:{status.port}</span> and
+            Sidelong listens on <span className="font-mono text-zinc-300">127.0.0.1:{status.port}</span> and
             installs Claude Code hooks that POST there. Nothing leaves this machine.
           </p>
           {status.message && (
@@ -715,7 +687,7 @@ function Setup({ onClose }: { onClose: () => void }): JSX.Element {
           </div>
           <p className="mt-auto pt-2 text-[10px] text-zinc-600">
             Verify inside Claude Code with <span className="font-mono text-zinc-500">/hooks</span>. Closing
-            Agent Watcher never affects a running session.
+            Sidelong never affects a running session.
           </p>
         </>
       )}

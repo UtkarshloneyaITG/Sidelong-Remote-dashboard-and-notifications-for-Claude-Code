@@ -1,5 +1,5 @@
 /**
- * Agent Watcher VS Code bridge.
+ * Sidelong VS Code bridge.
  *
  * WHAT THIS CANNOT DO, stated plainly: it cannot see inside the Claude Code
  * extension. The VS Code API has no way to read another extension's internal
@@ -36,14 +36,26 @@ let disposed = false;
  * avoids asking the user to paste a secret into VS Code settings (where it would
  * end up in settings sync). Overridable for unusual installs.
  */
+/** New setting first, then the pre-rename one, so nobody's override evaporates. */
+function setting<T>(key: string): T | undefined {
+  return vscode.workspace.getConfiguration('sidelong').get<T>(key)
+    ?? vscode.workspace.getConfiguration('agentWatcher').get<T>(key);
+}
+
 function readToken(): string | undefined {
-  const configured = vscode.workspace.getConfiguration('agentWatcher').get<string>('token');
+  const configured = setting<string>('token');
   if (configured) return configured;
-  const candidates = process.platform === 'win32'
-    ? [join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'agent-watcher-desktop', 'config.json')]
+  // Current folder first, then the pre-rename one. The two can legitimately be
+  // out of step for a while: updating the extension and updating the app are
+  // separate downloads, and whichever you do second would otherwise look at a
+  // folder the other half is not writing yet.
+  const dirs = ['Sidelong', 'agent-watcher-desktop'];
+  const base = process.platform === 'win32'
+    ? (process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'))
     : process.platform === 'darwin'
-      ? [join(homedir(), 'Library', 'Application Support', 'agent-watcher-desktop', 'config.json')]
-      : [join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'agent-watcher-desktop', 'config.json')];
+      ? join(homedir(), 'Library', 'Application Support')
+      : (process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'));
+  const candidates = dirs.map((d) => join(base, d, 'config.json'));
   for (const file of candidates) {
     try {
       const cfg = JSON.parse(readFileSync(file, 'utf8')) as { token?: string };
@@ -55,8 +67,7 @@ function readToken(): string | undefined {
   return undefined;
 }
 
-const port = (): number =>
-  vscode.workspace.getConfiguration('agentWatcher').get<number>('port') ?? 47821;
+const port = (): number => setting<number>('port') ?? 47821;
 
 function setStatus(text: string, warn = false): void {
   status.text = `$(radio-tower) ${text}`;
@@ -119,7 +130,7 @@ function connect(): void {
   if (disposed || ws) return;
   const token = readToken();
   if (!token) {
-    setStatus('Agent Watcher: app not running', true);
+    setStatus('Sidelong: app not running', true);
     scheduleReconnect();
     return;
   }
@@ -140,7 +151,7 @@ function connect(): void {
     pingTimer = setInterval(() => {
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'ping' }));
     }, PING_MS);
-    setStatus('Agent Watcher');
+    setStatus('Sidelong');
   });
 
   socket.on('message', (raw) => {
@@ -163,7 +174,7 @@ function connect(): void {
     if (pingTimer) clearInterval(pingTimer);
     pingTimer = undefined;
     if (ws === socket) ws = undefined;
-    setStatus('Agent Watcher: reconnecting', true);
+    setStatus('Sidelong: reconnecting', true);
     scheduleReconnect();
   };
   socket.on('close', drop);
@@ -183,8 +194,8 @@ function scheduleReconnect(): void {
 export function activate(context: vscode.ExtensionContext): void {
   disposed = false;
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-  status.tooltip = 'Agent Watcher bridge — sends workspace, focus and diagnostics to the overlay';
-  setStatus('Agent Watcher: connecting', true);
+  status.tooltip = 'Sidelong bridge — sends workspace, focus and diagnostics to the overlay';
+  setStatus('Sidelong: connecting', true);
   status.show();
 
   context.subscriptions.push(
@@ -196,7 +207,7 @@ export function activate(context: vscode.ExtensionContext): void {
       sendSoon();
     }),
     vscode.languages.onDidChangeDiagnostics(sendSoon),
-    vscode.commands.registerCommand('agentWatcher.reconnect', () => {
+    vscode.commands.registerCommand('sidelong.reconnect', () => {
       ws?.close();
       reconnectDelay = RECONNECT_MIN_MS;
       connect();

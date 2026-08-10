@@ -9,7 +9,9 @@
  * window geometry, focus, or hook installation -- none of them touch agent state.
  */
 
-import { appendFileSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import {
   BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage,
@@ -17,9 +19,9 @@ import {
 } from 'electron';
 import {
   PERMISSION_GRACE_MS, buildView, commandKey, hookBaseUrl, prunable,
-  type BridgeInfo, type OverlayView,
-} from '@agent-watcher/protocol';
-import { AdapterRegistry, ClaudeCodeAdapter } from '@agent-watcher/agent-adapters';
+  type BridgeInfo, type DayCounts, type OverlayView,
+} from '@sidelong/protocol';
+import { AdapterRegistry, ClaudeCodeAdapter } from '@sidelong/agent-adapters';
 
 import { DEFAULT_PORT, loadConfig, updateConfig } from './config.js';
 import { IngestServer, PortInUseError, type Decision } from './ingest.js';
@@ -28,9 +30,39 @@ import { Notifier } from './notifier.js';
 import * as hooks from './hooks-installer.js';
 
 // Set BEFORE anything reads app.getPath('userData'): the package name is scoped
-// ("@agent-watcher/desktop") and would otherwise become a nested directory. The
+// ("@sidelong/desktop") and would otherwise become a nested directory. The
 // VS Code bridge looks for the token at this exact folder name.
-app.setName('agent-watcher-desktop');
+app.setName('Sidelong');
+
+/**
+ * Carry settings and statistics over from the pre-rename folder.
+ *
+ * The app used to store both under `agent-watcher-desktop`, one of three names
+ * this product answered to. Renaming the folder without moving what is in it
+ * would silently reset everyone's port, token and 30 days of history, and the
+ * token especially is not something you can be expected to notice going missing
+ * -- the hooks would just start getting 401s.
+ *
+ * Copies, never moves. The old folder stays exactly where it is, so downgrading
+ * to an older build finds everything it left behind, and a half-finished copy
+ * can be retried on the next launch rather than having destroyed the original.
+ */
+function migrateUserData(): void {
+  const to = app.getPath('userData');
+  const from = join(app.getPath('appData'), 'agent-watcher-desktop');
+  if (from === to || existsSync(join(to, 'config.json')) || !existsSync(from)) return;
+  try {
+    mkdirSync(to, { recursive: true });
+    for (const name of ['config.json', 'stats.json']) {
+      const src = join(from, name);
+      if (existsSync(src)) copyFileSync(src, join(to, name));
+    }
+  } catch {
+    // A fresh config is recoverable -- you re-run the hooks installer. Refusing
+    // to start over a failed copy is not.
+  }
+}
+migrateUserData();
 
 /**
  * The app mark. Windows toasts fall back to the stock Electron icon without it,
@@ -184,27 +216,9 @@ let statsDirty = false;
  * it, being an exact count of prompts you settled from the bar and therefore did
  * not switch windows for.
  */
-export interface DayCounts {
-  /** Permission prompts that survived the grace period and were shown to you. */
-  prompts: number;
-  /** Of those, ones you answered from the bar with Allow or Deny. */
-  answered: number;
-  /** Total wait across those, measured to the instant you clicked. */
-  answeredMs: number;
-  /** Prompts that cleared without you touching the bar -- answered in VS Code. */
-  elsewhere: number;
-  /** Total wait across those. */
-  elsewhereMs: number;
-  /** Tool calls started. */
-  tools: number;
-  /** Turns that ended. */
-  turns: number;
-  /** Sessions started. */
-  sessions: number;
-}
-
+export 
 const ZERO_COUNTS: DayCounts = {
-  prompts: 0, answered: 0, answeredMs: 0, elsewhere: 0, elsewhereMs: 0,
+  prompts: 0, answered: 0, answeredMs: 0, elsewhere: 0, elsewhereMs: 0, savedMs: 0,
   tools: 0, turns: 0, sessions: 0,
 };
 let countsByDay: Record<string, DayCounts> = {};
@@ -245,6 +259,24 @@ function bump(field: keyof DayCounts, by = 1): void {
  */
 const openPrompts = new Map<string, number>(); // id -> when it arrived
 const answeredInBar = new Map<string, number>(); // id -> wait at the moment of the click
+
+/**
+ * Mean wait for prompts settled in VS Code, across everything retained.
+ *
+ * The comparison baseline. Undefined until there are enough of them to mean
+ * anything -- crediting a prompt against a single sample would bake one outlier
+ * into a number that is never recomputed.
+ */
+const MIN_BASELINE = 3;
+function baselineElsewhereMs(): number | undefined {
+  let n = 0;
+  let ms = 0;
+  for (const c of Object.values(countsByDay)) {
+    n += c.elsewhere;
+    ms += c.elsewhereMs;
+  }
+  return n >= MIN_BASELINE ? ms / n : undefined;
+}
 
 const promptId = (sessionId: string, key: string): string => `${sessionId}:${key}`;
 
@@ -287,6 +319,23 @@ function accruePrompts(view: {
     } else {
       bump('answered');
       bump('answeredMs', clicked);
+      // Bank what THIS prompt saved, now, against the baseline as it stands now.
+      //
+      // The figure used to be recomputed globally as
+      // (mean elsewhere - mean bar) x answered, which quietly rewrote history:
+      // answer one slow prompt today and the mean moves, so the total "saved"
+      // last Tuesday changed too, and the number on screen could go DOWN. Time
+      // already saved cannot be un-saved, and a total that walks backwards is
+      // not a total.
+      //
+      // Each prompt is credited once, against the baseline available when it
+      // resolved, and that credit is never revisited. Floored at zero: a prompt
+      // you answered slower than your own VS Code average contributes nothing
+      // rather than a negative. That makes this a sum of savings and not a net
+      // -- said plainly in the panel, because it is the one place the figure is
+      // deliberately generous.
+      const base = baselineElsewhereMs();
+      if (base !== undefined) bump('savedMs', Math.max(0, base - clicked));
     }
     openPrompts.delete(id);
     answeredInBar.delete(id);
@@ -411,6 +460,17 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // OFF, and this is the one setting here that is a compromise rather than a
+      // choice. Turning it on was tried and measured: the app starts, the window
+      // never survives, and Electron quits on all-windows-closed. The cause is
+      // somewhere in the electron-vite preload pipeline and has not been run
+      // down, so this stays off rather than shipping a window that does not open.
+      //
+      // What the isolation actually rests on, none of which this weakens:
+      // contextIsolation is on, nodeIntegration is off, and the preload exposes
+      // no channel that can set an agent status -- so a compromised renderer can
+      // resize a window and ask VS Code for focus, and that is the whole reach.
+      // Revisit when the preload build is next touched.
       sandbox: false,
     },
   });
@@ -588,10 +648,10 @@ async function startServers(): Promise<void> {
 async function portInUse(port: number): Promise<void> {
   const { response } = await dialog.showMessageBox({
     type: 'error',
-    title: 'Agent Watcher: port in use',
+    title: 'Sidelong: port in use',
     message: `Port ${port} is already in use.`,
     detail:
-      `Agent Watcher cannot start on ${port}, and it will not silently move to `
+      `Sidelong cannot start on ${port}, and it will not silently move to `
       + `another port: the port is written into your Claude Code hook settings, `
       + `so moving it would leave every installed hook pointing at nothing.\n\n`
       + `Free the port, or pick a new one and reinstall the hooks.`,
@@ -948,7 +1008,11 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   void app.whenReady().then(async () => {
-    if (process.platform === 'win32') app.setAppUserModelId('com.agentwatcher.overlay');
+    // Must equal `appId` in electron-builder.yml. Windows keys toast identity off
+    // this, matching it against the Start-menu shortcut the installer wrote with
+    // the appId -- and these two had drifted apart, so notifications were being
+    // attributed to a shortcut that does not exist under that name.
+    if (process.platform === 'win32') app.setAppUserModelId('dev.sidelong.overlay');
     loadStats();
     registerIpc();
     win = createWindow();

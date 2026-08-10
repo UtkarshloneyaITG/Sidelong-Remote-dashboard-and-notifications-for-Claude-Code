@@ -1,7 +1,7 @@
 /**
- * Writing Agent Watcher's hooks into a Claude Code settings file.
+ * Writing Sidelong's hooks into a Claude Code settings file.
  *
- * The rules live in @agent-watcher/protocol as pure functions; this file only
+ * The rules live in @sidelong/protocol as pure functions; this file only
  * does the I/O -- read, merge, back up, write -- so the merge/uninstall/drift
  * logic stays unit-tested.
  *
@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import {
   allowlistProblem, findDrift, hookBaseUrl, mergeHooks, removeHooks,
   type SettingsFile,
-} from '@agent-watcher/protocol';
+} from '@sidelong/protocol';
 
 /**
  * `user` is the default: one install covers every project, and a per-project
@@ -52,8 +52,8 @@ function readSettings(file: string): SettingsFile {
 function writeSettings(file: string, settings: SettingsFile): void {
   mkdirSync(dirname(file), { recursive: true });
   // One backup, taken before the first modification and never overwritten --
-  // so it is always the file as it was before Agent Watcher touched anything.
-  const backup = `${file}.agent-watcher-backup`;
+  // so it is always the file as it was before Sidelong touched anything.
+  const backup = `${file}.sidelong-backup`;
   if (existsSync(file) && !existsSync(backup)) copyFileSync(file, backup);
   writeFileSync(file, JSON.stringify(settings, null, 2) + '\n', 'utf8');
 }

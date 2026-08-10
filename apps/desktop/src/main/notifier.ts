@@ -10,7 +10,7 @@
  */
 
 import { Notification } from 'electron';
-import type { OverlayView, SessionView, Status } from '@agent-watcher/protocol';
+import type { OverlayView, SessionView, Status } from '@sidelong/protocol';
 
 /** One notification per (session, status) transition, at most this often. */
 const THROTTLE_MS = 3_000;

@@ -1,5 +1,5 @@
 {
-  "name": "@agent-watcher/protocol",
+  "name": "@sidelong/protocol",
   "version": "0.1.8",
   "private": true,
   "type": "module",

@@ -8,7 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 // workspace symlink layout, and packaging does not have to resolve hoisted
 // dependencies out of the monorepo root. `ws` is pure JS (its native accelerators
 // are optional and guarded), so it bundles cleanly.
-const internal = ['@agent-watcher/protocol', '@agent-watcher/agent-adapters', 'ws'];
+const internal = ['@sidelong/protocol', '@sidelong/agent-adapters', 'ws'];
 
 export default defineConfig({
   main: {

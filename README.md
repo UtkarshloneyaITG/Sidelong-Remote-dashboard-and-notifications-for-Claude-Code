@@ -135,7 +135,7 @@ stops, and you find out when you happen to look. Multiply that by a dozen times 
 > **The state machine is a pure function** — `(state, event) → state` in
 > [`packages/protocol/src/reducer.ts`](packages/protocol/src/reducer.ts). No I/O, no timers,
 > no `Date.now()`, no Electron imports. That function is the product; everything else is
-> plumbing around it. It is what the 61 tests test.
+> plumbing around it. It is what the test suite tests.
 
 ### Components
 
@@ -182,7 +182,7 @@ state, no duplication.
 |---|---|
 | **[Sidelong-Setup-x.y.z.exe](https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/latest)** | Windows installer. Start-menu entry, per-user, no admin. |
 | **[Sidelong-x.y.z-portable.exe](https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/latest)** | Single file, run it from anywhere. Nothing installed. |
-| **[agent-watcher-bridge.vsix](https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/latest)** | Optional VS Code extension. |
+| **[sidelong-claude-status-bar.vsix](https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/latest)** | Optional VS Code extension. |
 
 > [!NOTE]
 > The binaries are **unsigned** — a code-signing certificate costs a few hundred
@@ -190,7 +190,7 @@ state, no duplication.
 > run; choose **More info → Run anyway**. Every release is built by the
 > [Release workflow](.github/workflows/release.yml) from tagged source on GitHub's
 > runners, so you can check exactly what produced the file you downloaded — or build
-> it yourself with `npm run dist -w @agent-watcher/desktop`.
+> it yourself with `npm run dist -w @sidelong/desktop`.
 
 **Upgrading is the same file.** Download the new `Setup.exe` and run it — its first page
 reads what you already have and says which of the three things is about to happen:
@@ -256,7 +256,7 @@ Or in the app: expand → **Hooks** → **Install**.
 /hooks
 
 # from a shell
-curl -H "X-Agent-Watcher-Token: <token>" http://127.0.0.1:47821/health
+curl -H "X-Sidelong-Token: <token>" http://127.0.0.1:47821/health
 # {"ok":true,"protocolVersion":1}
 ```
 
@@ -264,8 +264,8 @@ curl -H "X-Agent-Watcher-Token: <token>" http://127.0.0.1:47821/health
 <tr><th align="left">4 · Bridge <i>(optional)</i></th><td>
 
 ```bash
-npm run package -w agent-watcher-bridge
-code --install-extension extensions/vscode-bridge/agent-watcher-bridge.vsix
+npm run package -w sidelong-claude-status-bar
+code --install-extension extensions/vscode-bridge/sidelong-claude-status-bar.vsix
 ```
 
 Adds focus-aware notification suppression, auto-acknowledge on switching to VS Code,
@@ -446,8 +446,11 @@ up.
 
 ### Benchmarks
 
-**Measured, on the running app.** These are the app's own latencies, timed against a live
-Claude Code session:
+**Measured, on the running app.** The app's own latencies, timed against a live Claude Code
+session. Read these as order-of-magnitude, not as a benchmark: each is a **single manual
+measurement on one Windows 11 machine**, n=1, not a repeated run with a distribution behind
+it. They are laid out in a table because that is readable, not because a suite produced
+them.
 
 | What | Measured |
 |---|---|
@@ -483,9 +486,9 @@ No environment variables, no `.env`. One JSON file, created on first launch:
 
 | OS | Path |
 |----|------|
-| Windows | `%APPDATA%\agent-watcher-desktop\config.json` |
-| macOS | `~/Library/Application Support/agent-watcher-desktop/config.json` |
-| Linux | `~/.config/agent-watcher-desktop/config.json` |
+| Windows | `%APPDATA%\Sidelong\config.json` |
+| macOS | `~/Library/Application Support/Sidelong/config.json` |
+| Linux | `~/.config/Sidelong/config.json` |
 
 | Field | Default | Purpose |
 |-------|---------|---------|
@@ -549,7 +552,7 @@ The headline limits, stated plainly:
 
 ```bash
 npm run dev          # electron-vite dev, HMR on the renderer
-npm test             # the reducer suite — 61 tests
+npm test             # the reducer suite
 npm run typecheck    # all four workspaces
 npm run build        # everything
 
@@ -563,8 +566,11 @@ node tools/capture/capture.mjs fixtures/raw.jsonl      # record your own fixture
 
 ## Testing
 
-**The reducer is the product, so the reducer is what is tested** — 61 tests over a corpus of
-**real captured hook payloads**, asserting state *sequences*, not just end states.
+**The reducer is the product, so the reducer is what is tested** — a suite over a corpus of
+**real captured hook payloads**, asserting state *sequences*, not just end states. The count
+is deliberately not written down here: it was stated as 61 while the suite had grown well
+past it, which is the failure mode of every hand-maintained number. The
+[CI badge](.github/workflows/ci.yml) is the live one.
 
 Pinned down: activity lines come from real tool input and are never invented ·
 `PermissionRequest` beats the `Notification` backstop and they never double-alert · a
@@ -584,6 +590,16 @@ built, so a tag can never ship something that would have failed a PR.
 *The macOS and Linux jobs prove it **builds** there. They do not prove the overlay
 **behaves** there — always-on-top, notifications and focus detection are still only
 verified by hand on Windows 11.*
+
+> [!WARNING]
+> **What is NOT covered, stated as plainly as what is.** The tests cover the protocol
+> package: the reducer, the view model, the hook-config maths and the Analysis arithmetic.
+> They do **not** cover the HTTP receiver, the main process, the renderer, the notifier, the
+> bridge, or the VS Code extension — roughly 2,800 lines with no automated tests at all.
+> That includes the `settle()`-runs-once guarantee in `ingest.ts`, which a blocked tool call
+> depends on and which is currently held up by a flag and a comment rather than a test.
+> Those paths are verified by hand against a running app, which is weaker and does not
+> re-run on every push.
 
 **The kill-the-app test.** The property that makes this design acceptable is that closing
 > the overlay must never affect your coding session. Verified directly: app killed
@@ -685,11 +701,11 @@ always prefers the most concrete real thing known: the pending command → the r
 ```bash
 node tools/install-hooks.mjs uninstall                 # user scope
 node tools/install-hooks.mjs uninstall --scope project
-code --uninstall-extension agent-watcher.agent-watcher-bridge
+code --uninstall-extension sidelong.sidelong-claude-status-bar
 ```
 
 Removes **only** entries whose URL starts with this app's base URL — nothing else is touched.
-Your original settings file is also backed up at `settings.json.agent-watcher-backup` from
+Your original settings file is also backed up at `settings.json.sidelong-backup` from
 before the first change. Inside Claude Code, `/hooks` shows what remains and
 `disableAllHooks` turns everything off at once.
 
@@ -717,7 +733,7 @@ non-blocking, so Sidelong cannot take your coding session down with it.
 run things.
 
 ```jsonc
-// %APPDATA%\agent-watcher-desktop\config.json
+// %APPDATA%\Sidelong\config.json
 "permissionDecisions": true,
 "decisionWindowMs": 15000
 ```

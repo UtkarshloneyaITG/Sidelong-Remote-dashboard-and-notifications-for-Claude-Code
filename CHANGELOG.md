@@ -9,6 +9,94 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Documentation
+
+- **The README was overstating its own coverage, and undercounting its own tests.**
+  It claimed "61 tests" in three places while the suite had grown past it — the
+  failure mode of every hand-maintained number, so the count is gone and the CI
+  badge is the live one. Added, in the same section, what is **not** covered: the
+  HTTP receiver, main process, renderer, notifier, bridge and VS Code extension,
+  roughly 2,800 lines with no automated tests, including the `settle()`-runs-once
+  guarantee that a blocked tool call depends on.
+- **The latency table is now labelled n=1.** Each figure is a single manual
+  measurement on one Windows 11 machine. Laid out as a table because that is
+  readable — not because a suite produced it, which is how it read.
+- **`sandbox: false` now says why.** It was the one security-relevant setting with
+  no reason attached. Turning it on was tried and measured: the window never
+  survives and Electron quits on all-windows-closed. Left off deliberately, with the
+  compensating controls named and a note to revisit when the preload build is next
+  touched.
+
+### Changed
+
+- **One name.** The product was called Sidelong on the outside and `agent-watcher`
+  on the inside, and the seam showed: the window was titled *Agent Watcher* in
+  alt-tab, the VS Code extension was *Agent Watcher Bridge*, its settings lived
+  under `agentWatcher.*`, config and 30 days of statistics sat in
+  `%APPDATA%\agent-watcher-desktop`, and the hooks in your `settings.json`
+  authenticated with `X-Agent-Watcher-Token`. You installed one product and met
+  three names.
+
+  Everything now says **Sidelong**, and identifiers use
+  `sidelong-claude-status-bar` — which is also the extension's new name, so the
+  words people actually search for sit on the searchable surface instead of in
+  the product name.
+
+  Nothing is lost on upgrade, and each transition is handled rather than assumed:
+
+  - **Config and statistics migrate on first launch** — copied, not moved, so the
+    old folder survives a downgrade and a failed copy can be retried instead of
+    having destroyed the original. The token travels with them, which matters more
+    than it looks: lose it and every hook silently starts getting 401s.
+  - **The receiver accepts both auth headers.** Hooks already written into your
+    `settings.json` keep working untouched. Drift detection is what tells you to
+    reinstall them, and it cannot tell you anything if the app looks dead.
+  - **The extension reads both config folder names and both settings namespaces.**
+    Updating the app and updating the extension are separate downloads; whichever
+    you do second would otherwise be looking where the other half is not writing.
+
+  Not covered, and deliberately so: the extension **identifier** changed, so VS
+  Code treats it as a new extension. If you installed the old bridge, uninstall
+  *Agent Watcher Bridge* by hand or you will have two of them contending for the
+  same port.
+
+### Fixed
+
+- **"Time saved" could go down.** Reported from use, and the reporter was right that it
+  should not be possible. The figure was computed as
+  `(mean elsewhere − mean bar) × answered` and recomputed from scratch on every
+  render, so both means moved as new prompts arrived — answer one slow prompt today
+  and the total credited to days already past shrank. Time already saved cannot be
+  un-saved.
+
+  Each prompt is now credited **once**, when it resolves, against the baseline as it
+  stood at that moment, and that credit is never revisited. For a fixed set of days
+  the total can only grow. A prompt answered slower than your own VS Code average
+  banks zero rather than a negative, which makes this a sum of savings and not a net
+  — stated in the panel, since it is the one place the figure is deliberately
+  generous.
+
+  The maths moved into the protocol package to get there, so it is now covered by
+  tests — including one that appends a run of prompts, several of them slow, and
+  asserts the total never falls.
+
+- **No `Host` header check on the receiver.** Binding to `127.0.0.1` stops other
+  machines connecting; it does not stop a web page you are visiting from resolving
+  its own hostname to `127.0.0.1` and posting from your browser. The token would
+  have refused it, but the Host header is what makes an attacker guess the token
+  rather than get an attempt per page load. Loopback names only, and only our port —
+  verified with a raw socket sending `Host: evil.example.com` and a valid token: 403.
+
+- **Windows toast identity.** `setAppUserModelId` was `com.agentwatcher.overlay`
+  while the installer writes Start-menu shortcuts under `dev.sidelong.overlay`.
+  Windows matches a toast to a shortcut by exactly that ID, so it was being handed
+  one that exists under no name at all — found while auditing the naming, not from
+  a symptom.
+
+---
+
 ## [0.1.8] — 2026-08-10
 
 ### Added

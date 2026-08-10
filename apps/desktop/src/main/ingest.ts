@@ -13,7 +13,7 @@
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import type { HookEvent, IngestEnvelope } from '@agent-watcher/protocol';
+import type { HookEvent, IngestEnvelope } from '@sidelong/protocol';
 import { tokenMatches } from './config.js';
 
 /** Hook payloads are large (a Write carries the whole file). Cap, do not stream. */
@@ -98,9 +98,36 @@ export class IngestServer {
 
   private handle(req: IncomingMessage, res: ServerResponse): void {
     const url = req.url ?? '/';
-    const token = req.headers['x-agent-watcher-token'];
 
-    if (!tokenMatches(Array.isArray(token) ? token[0] : token, this.opts.token)) {
+    // Reject anything that reached us under a name that is not loopback.
+    //
+    // Binding to 127.0.0.1 stops other machines connecting; it does NOT stop a
+    // web page you happen to be visiting from resolving its own hostname to
+    // 127.0.0.1 and posting here from your browser. That is DNS rebinding, and
+    // the Host header is what distinguishes it: the browser sends the attacker's
+    // name, never ours. The token would refuse them anyway -- this is the layer
+    // that means an attacker has to guess the token rather than get one attempt
+    // per page load.
+    const host = (req.headers.host ?? '').toLowerCase();
+    const allowedHosts = [
+      `127.0.0.1:${this.opts.port}`,
+      `localhost:${this.opts.port}`,
+      `[::1]:${this.opts.port}`,
+    ];
+    if (!allowedHosts.includes(host)) {
+      return this.reject(res, 403, `bad host "${host}" ${req.method} ${url}`, req);
+    }
+
+    // Both header names, because the hooks that send them live in the user's
+    // settings.json and were written by whichever version installed them. An
+    // installed base still sending the old name would otherwise get a wall of
+    // 401s and an overlay that looks broken rather than out of date -- drift
+    // detection is what tells them to reinstall, and it cannot do that if the
+    // app appears dead. The value compared is the same secret either way.
+    const header = req.headers['x-sidelong-token'] ?? req.headers['x-agent-watcher-token'];
+    const token = Array.isArray(header) ? header[0] : header;
+
+    if (!tokenMatches(token, this.opts.token)) {
       return this.reject(res, 401, `unauthenticated ${req.method} ${url}`, req);
     }
     // Liveness probe for the end-to-end verification in the README.

@@ -8,7 +8,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-import type { OverlayView } from '@agent-watcher/protocol';
+import type { OverlayView } from '@sidelong/protocol';
 
 export type RendererView = OverlayView & { expanded: boolean };
 

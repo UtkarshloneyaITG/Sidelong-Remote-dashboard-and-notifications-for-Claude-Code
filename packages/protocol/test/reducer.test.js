@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 import { loadFixture } from '../../../tools/replay.mjs';
 import {
-  absoluteFile, commandKey,
+  absoluteFile, commandKey, savings, trend,
   buildHookConfig, buildView, describePermission, describeTool, findDrift, allowlistProblem,
   PERMISSION_GRACE_MS, humanGap, decisionTimeoutSeconds,
   initialState, isStale, mergeHooks, reduce, reduceAll, removeHooks, severityOf, shortPath,
@@ -294,6 +294,59 @@ test('commandKey never lets payload text reach the key', () => {
                      k('git push https://user:pw@host/repo main')]) {
     assert.ok(!/sk-abc123|user:pw|Authorization/.test(key), `leaked: ${key}`);
   }
+});
+
+// ------------------------------------------------------------ analysis maths
+
+const day = (o = {}) => ({
+  prompts: 0, answered: 0, answeredMs: 0, elsewhere: 0, elsewhereMs: 0,
+  savedMs: 0, tools: 0, turns: 0, sessions: 0, ...o,
+});
+
+test('savings is withheld until both groups have enough samples', () => {
+  assert.equal(savings([day({ answered: 2, elsewhere: 9, savedMs: 50_000 })]), null);
+  assert.equal(savings([day({ answered: 9, elsewhere: 2, savedMs: 50_000 })]), null);
+  assert.equal(savings([day({ answered: 9, elsewhere: 9, savedMs: 0 })]), null, 'nothing banked');
+  assert.ok(savings([day({ answered: 3, elsewhere: 3, savedMs: 30_000 })]));
+});
+
+test('savings is a SUM of what was banked, not a mean re-multiplied', () => {
+  const s = savings([
+    day({ answered: 2, elsewhere: 2, savedMs: 10_000 }),
+    day({ answered: 2, elsewhere: 2, savedMs: 30_000 }),
+  ]);
+  assert.equal(s.total, 40_000);
+  assert.equal(s.answered, 4);
+  assert.equal(s.perPrompt, 10_000);
+});
+
+test('savings never goes DOWN as more prompts arrive', () => {
+  // The bug: the old form was (mean elsewhere - mean bar) x answered, so one
+  // slow answer today shrank the total credited to days already past. A total
+  // that walks backwards is not a total.
+  const rows = [day({ answered: 3, elsewhere: 3, savedMs: 30_000 })];
+  let last = savings(rows).total;
+
+  // A run of prompts, including several answered far SLOWER than the baseline.
+  // Those bank zero; they must never subtract.
+  for (const credit of [9_000, 0, 0, 12_000, 0, 400, 0, 0, 25_000]) {
+    rows.push(day({ answered: 1, elsewhere: 1, savedMs: credit }));
+    const now = savings(rows).total;
+    assert.ok(now >= last, `total fell from ${last} to ${now}`);
+    last = now;
+  }
+  assert.equal(last, 30_000 + 9_000 + 12_000 + 400 + 25_000);
+});
+
+test('trend needs a whole previous window, and a non-zero one', () => {
+  const d = (blockedMs) => ({ blockedMs });
+  assert.equal(trend([d(5), d(5), d(5)], 7), null, 'not enough history');
+  assert.equal(trend(Array.from({ length: 14 }, () => d(0)), 7), null, 'previous window empty');
+
+  const halved = [...Array.from({ length: 7 }, () => d(200)), ...Array.from({ length: 7 }, () => d(100))];
+  const t = trend(halved, 7);
+  assert.equal(t.prev, 1400);
+  assert.equal(t.delta, -0.5);
 });
 
 // ------------------------------------------------------------ invariants
@@ -750,7 +803,7 @@ test('every installed hook carries an explicit short timeout', () => {
   for (const h of all) {
     assert.equal(h.type, 'http');
     assert.ok(h.timeout > 0 && h.timeout <= 5, `timeout ${h.timeout} must be short`);
-    assert.equal(h.headers['X-Agent-Watcher-Token'], 'tok');
+    assert.equal(h.headers['X-Sidelong-Token'], 'tok');
     assert.match(h.url, /^http:\/\/127\.0\.0\.1:47821\//);
   }
 });

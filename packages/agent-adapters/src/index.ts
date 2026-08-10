@@ -29,7 +29,7 @@
 
 import {
   initialState, reduce, type IngestEnvelope, type WatcherState,
-} from '@agent-watcher/protocol';
+} from '@sidelong/protocol';
 
 export interface AgentEvent {
   adapterId: string;

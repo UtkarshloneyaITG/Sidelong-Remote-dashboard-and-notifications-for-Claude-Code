@@ -1,5 +1,5 @@
 /**
- * Building, merging and removing Agent Watcher's hook entries in a Claude Code
+ * Building, merging and removing Sidelong's hook entries in a Claude Code
  * settings file.
  *
  * Pure functions over the parsed JSON, so the install/uninstall/drift rules are
@@ -28,7 +28,7 @@ export interface SettingsFile {
   [k: string]: unknown;
 }
 
-export const TOKEN_HEADER = 'X-Agent-Watcher-Token';
+export const TOKEN_HEADER = 'X-Sidelong-Token';
 
 /**
  * Every hook gets an explicit short timeout. The Claude Code default for HTTP
@@ -195,7 +195,7 @@ export function findDrift(
   if (missing.length) {
     return `${missing.length} hook${missing.length === 1 ? '' : 's'} not installed (${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}).`;
   }
-  if (strays.length) return `${strays.length} stale Agent Watcher hook(s) from an older install.`;
+  if (strays.length) return `${strays.length} stale Sidelong hook(s) from an older install.`;
   return undefined;
 }
 

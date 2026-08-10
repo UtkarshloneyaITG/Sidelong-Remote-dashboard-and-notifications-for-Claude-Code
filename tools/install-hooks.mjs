@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Install / remove / inspect Agent Watcher's Claude Code hooks from the command
+ * Install / remove / inspect Sidelong's Claude Code hooks from the command
  * line. Does exactly what the app's Hooks panel does -- it calls the same pure
- * functions from @agent-watcher/protocol -- for headless setup and for verifying
+ * functions from @sidelong/protocol -- for headless setup and for verifying
  * an install without launching the GUI.
  *
  *   node tools/install-hooks.mjs status
@@ -46,10 +46,10 @@ const settingsFile = scope === 'user'
 /** The app's config, so the CLI and the GUI always agree on port and token. */
 function appConfig() {
   const dirs = process.platform === 'win32'
-    ? [join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'agent-watcher-desktop')]
+    ? [join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Sidelong')]
     : process.platform === 'darwin'
-      ? [join(homedir(), 'Library', 'Application Support', 'agent-watcher-desktop')]
-      : [join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'agent-watcher-desktop')];
+      ? [join(homedir(), 'Library', 'Application Support', 'Sidelong')]
+      : [join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'Sidelong')];
   for (const d of dirs) {
     try {
       return JSON.parse(readFileSync(join(d, 'config.json'), 'utf8'));
@@ -69,7 +69,7 @@ const read = (f) => {
 
 const write = (f, s) => {
   mkdirSync(dirname(f), { recursive: true });
-  const backup = `${f}.agent-watcher-backup`;
+  const backup = `${f}.sidelong-backup`;
   if (existsSync(f) && !existsSync(backup)) copyFileSync(f, backup);
   writeFileSync(f, JSON.stringify(s, null, 2) + '\n', 'utf8');
 };
@@ -77,7 +77,7 @@ const write = (f, s) => {
 const cfg = appConfig();
 if (!cfg && cmd !== 'uninstall') {
   console.error(
-    'Could not find the desktop app config. Launch Agent Watcher once so it can\n'
+    'Could not find the desktop app config. Launch Sidelong once so it can\n'
     + 'generate its port and token, then run this again.',
   );
   process.exit(1);
@@ -99,7 +99,7 @@ switch (cmd) {
       break;
     }
     write(settingsFile, removeHooks(read(settingsFile), port));
-    console.log(`removed Agent Watcher hooks from ${settingsFile}`);
+    console.log(`removed Sidelong hooks from ${settingsFile}`);
     break;
   }
   case 'status': {

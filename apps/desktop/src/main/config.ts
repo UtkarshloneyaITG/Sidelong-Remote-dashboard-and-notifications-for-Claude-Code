@@ -22,7 +22,7 @@ export interface AppConfig {
    *
    * NOTE: the default collides with VS Code's "Trigger Parameter Hints"
    * (Ctrl+Shift+Space). A global shortcut wins, so VS Code loses that binding
-   * while Agent Watcher runs. Change this line if you use parameter hints --
+   * while Sidelong runs. Change this line if you use parameter hints --
    * Ctrl+Alt+Space is unbound on a stock Windows + VS Code setup.
    */
   shortcut: string;

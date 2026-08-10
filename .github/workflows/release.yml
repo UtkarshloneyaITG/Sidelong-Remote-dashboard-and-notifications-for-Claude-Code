@@ -30,10 +30,10 @@ jobs:
       - run: npm run build
 
       - name: Package installer + portable
-        run: npm run dist -w @agent-watcher/desktop
+        run: npm run dist -w @sidelong/desktop
 
       - name: Package the VS Code extension
-        run: npm run package -w agent-watcher-bridge
+        run: npm run package -w sidelong-claude-status-bar
 
       - name: Attach artifacts to the release
         uses: softprops/action-gh-release@v2
@@ -43,4 +43,4 @@ jobs:
           files: |
             release/Sidelong-Setup-*.exe
             release/Sidelong-*-portable.exe
-            extensions/vscode-bridge/agent-watcher-bridge.vsix
+            extensions/vscode-bridge/sidelong-claude-status-bar.vsix

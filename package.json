@@ -1,5 +1,5 @@
 {
-  "name": "agent-watcher",
+  "name": "sidelong",
   "version": "0.1.8",
   "private": true,
   "description": "Always-on-top overlay showing live Claude Code state, driven by Claude Code hooks.",
@@ -10,12 +10,12 @@
     "extensions/*"
   ],
   "scripts": {
-    "test": "npm run test -w @agent-watcher/protocol",
+    "test": "npm run test -w @sidelong/protocol",
     "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",
-    "build:packages": "npm run build -w @agent-watcher/protocol && npm run build -w @agent-watcher/agent-adapters",
-    "dev": "npm run build:packages && npm run dev -w @agent-watcher/desktop",
-    "build": "npm run build:packages && npm run build -w @agent-watcher/desktop && npm run build -w agent-watcher-bridge",
-    "start": "npm run start -w @agent-watcher/desktop",
+    "build:packages": "npm run build -w @sidelong/protocol && npm run build -w @sidelong/agent-adapters",
+    "dev": "npm run build:packages && npm run dev -w @sidelong/desktop",
+    "build": "npm run build:packages && npm run build -w @sidelong/desktop && npm run build -w sidelong-claude-status-bar",
+    "start": "npm run start -w @sidelong/desktop",
     "replay": "node tools/replay.mjs",
     "capture": "node tools/capture/capture.mjs"
   },

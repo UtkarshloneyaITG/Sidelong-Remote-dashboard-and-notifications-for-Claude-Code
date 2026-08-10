@@ -1,5 +1,5 @@
 {
-  "name": "@agent-watcher/desktop",
+  "name": "@sidelong/desktop",
   "version": "0.1.8",
   "private": true,
   "description": "The always-on-top overlay: hook receiver, state machine host, and UI.",
@@ -13,8 +13,8 @@
     "dist": "electron-builder --config electron-builder.yml --publish never"
   },
   "dependencies": {
-    "@agent-watcher/agent-adapters": "*",
-    "@agent-watcher/protocol": "*",
+    "@sidelong/agent-adapters": "*",
+    "@sidelong/protocol": "*",
     "ws": "^8.21.3"
   },
   "devDependencies": {

@@ -10,7 +10,7 @@
 
 import type { Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { PROTOCOL_VERSION, parseBridgeMessage, type BridgeInfo } from '@agent-watcher/protocol';
+import { PROTOCOL_VERSION, parseBridgeMessage, type BridgeInfo } from '@sidelong/protocol';
 import { tokenMatches } from './config.js';
 
 const HEARTBEAT_MS = 15_000;

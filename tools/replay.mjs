@@ -61,7 +61,7 @@ if ((process.argv[1] ?? '').endsWith('replay.mjs')) {
         : `/hooks/claude-code/${e.hook_event_name}`;
       const res = await fetch(`http://127.0.0.1:${port}${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Agent-Watcher-Token': token },
+        headers: { 'Content-Type': 'application/json', 'X-Sidelong-Token': token },
         body: JSON.stringify(e),
       }).catch((err) => ({ status: `ERR ${err.message}` }));
       console.log(String(res.status).padEnd(6), e.hook_event_name, e.tool_name ?? '');
@@ -73,7 +73,7 @@ if ((process.argv[1] ?? '').endsWith('replay.mjs')) {
     try {
       protocol = require('../packages/protocol/dist/index.js');
     } catch {
-      console.error('build the protocol package first:  npm run build -w @agent-watcher/protocol');
+      console.error('build the protocol package first:  npm run build -w @sidelong/protocol');
       process.exit(1);
     }
     let state = protocol.initialState;

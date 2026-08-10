@@ -116,7 +116,7 @@ node tools/install-hooks.mjs status</code></pre>
       <div class="note">
         <p><strong>It is safe to run on an existing settings file.</strong> The installer merges
         into existing hook arrays without clobbering them, is idempotent, backs the file up once
-        before its first change (<code>settings.json.agent-watcher-backup</code>), and never
+        before its first change (<code>settings.json.sidelong-backup</code>), and never
         writes managed policy settings. Uninstall removes only entries whose URL starts with
         Sidelong's own base URL.</p>
       </div>
@@ -127,7 +127,7 @@ node tools/install-hooks.mjs status</code></pre>
       <p>Inside Claude Code, list the installed hooks:</p>
 <pre><code>/hooks</code></pre>
       <p>And confirm the receiver is live (token is in your config file):</p>
-<pre><code>curl -H "X-Agent-Watcher-Token: &lt;token&gt;" http://127.0.0.1:47821/health
+<pre><code>curl -H "X-Sidelong-Token: &lt;token&gt;" http://127.0.0.1:47821/health
 <span class="c"># {"ok":true,"protocolVersion":1}</span></code></pre>
       <p>Now give Claude Code a task. The bar should move within a second.</p>
       <div class="note">
@@ -139,8 +139,8 @@ node tools/install-hooks.mjs status</code></pre>
 
     <div class="step">
       <h3>Add the VS Code bridge <span style="color:var(--text-3);font-family:var(--mono);font-size:12px">— optional</span></h3>
-<pre><code>npm run package -w agent-watcher-bridge
-code --install-extension extensions/vscode-bridge/agent-watcher-bridge.vsix</code></pre>
+<pre><code>npm run package -w sidelong-claude-status-bar
+code --install-extension extensions/vscode-bridge/sidelong-claude-status-bar.vsix</code></pre>
       <p>The overlay is fully functional without it. Installing it adds:</p>
       <ul class="tight">
         <li>notifications suppressed while VS Code already has focus</li>
@@ -160,9 +160,9 @@ code --install-extension extensions/vscode-bridge/agent-watcher-bridge.vsix</cod
   <h2>One file. No env vars.</h2>
   <table>
     <tr><th>OS</th><th>Config path</th></tr>
-    <tr><td>Windows</td><td><code>%APPDATA%\agent-watcher-desktop\config.json</code></td></tr>
-    <tr><td>macOS</td><td><code>~/Library/Application Support/agent-watcher-desktop/config.json</code></td></tr>
-    <tr><td>Linux</td><td><code>~/.config/agent-watcher-desktop/config.json</code></td></tr>
+    <tr><td>Windows</td><td><code>%APPDATA%\Sidelong\config.json</code></td></tr>
+    <tr><td>macOS</td><td><code>~/Library/Application Support/Sidelong/config.json</code></td></tr>
+    <tr><td>Linux</td><td><code>~/.config/Sidelong/config.json</code></td></tr>
   </table>
   <table>
     <tr><th>Field</th><th>Default</th><th>Purpose</th></tr>
@@ -200,7 +200,7 @@ code --install-extension extensions/vscode-bridge/agent-watcher-bridge.vsix</cod
   <h2>Clean uninstall.</h2>
 <pre><code>node tools/install-hooks.mjs uninstall                 <span class="c"># user scope</span>
 node tools/install-hooks.mjs uninstall --scope project
-code --uninstall-extension agent-watcher.agent-watcher-bridge</code></pre>
+code --uninstall-extension sidelong.sidelong-claude-status-bar</code></pre>
   <p>
     Only entries whose URL starts with Sidelong's base URL are removed — nothing else in your
     settings is touched, and the pre-change backup is still there. Inside Claude Code,
