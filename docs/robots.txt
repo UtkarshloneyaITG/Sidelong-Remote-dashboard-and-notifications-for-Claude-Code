@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://gamith24.github.io/sidelong-claude-code-status-bar/sitemap.xml
+Sitemap: https://gamith24.github.io/sidelog-claude-code-status-bar/sitemap.xml
