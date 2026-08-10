@@ -1,6 +1,6 @@
 {
   "name": "@agent-watcher/protocol",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "type": "module",
   "description": "Shared types, the pure state reducer, and hook-config rules. ZERO runtime dependencies, on purpose: imported by the Electron main process, the renderer, and the VS Code extension.",

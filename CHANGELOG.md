@@ -9,7 +9,7 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
-## [Unreleased]
+## [0.1.8] — 2026-08-10
 
 ### Added
 
@@ -381,6 +381,7 @@ See [docs/CAPABILITIES.md](docs/CAPABILITIES.md). The significant ones: permissi
 during model inference; and macOS and Linux build in CI but their overlay
 behaviour is untested.
 
+[0.1.8]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.8
 [0.1.7]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.7
 [0.1.6]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.6
 [0.1.5]: https://github.com/UtkarshloneyaITG/sidelong-claude-code-status-bar/releases/tag/v0.1.5
