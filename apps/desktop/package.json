@@ -1,6 +1,6 @@
 {
   "name": "@sidelong/desktop",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "The always-on-top overlay: hook receiver, state machine host, and UI.",
   "license": "MIT",

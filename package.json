@@ -1,6 +1,6 @@
 {
   "name": "sidelong",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Always-on-top overlay showing live Claude Code state, driven by Claude Code hooks.",
   "license": "MIT",
