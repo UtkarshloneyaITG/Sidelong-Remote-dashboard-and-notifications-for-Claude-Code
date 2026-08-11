@@ -491,6 +491,11 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Chromium refuses audio until the user has interacted with the page, and
+      // this page is a status bar -- you may never click it at all. Without this
+      // the blocked chime would be silently dropped in exactly the case it exists
+      // for: you are looking somewhere else entirely.
+      autoplayPolicy: 'no-user-gesture-required',
       // OFF, and this is the one setting here that is a compromise rather than a
       // choice. Turning it on was tried and measured: the app starts, the window
       // never survives, and Electron quits on all-windows-closed. The cause is
@@ -612,7 +617,8 @@ function currentView(): OverlayView {
 function pushView(): void {
   const view = currentView();
   accruePrompts(view);
-  win?.webContents.send('view', { ...view, expanded: loadConfig().expanded });
+  const cfg = loadConfig();
+  win?.webContents.send('view', { ...view, expanded: cfg.expanded, sound: cfg.sound });
   // Gated here rather than inside Notifier: the notifier still tracks state, so
   // switching notifications back on does not fire a backlog of toasts for things
   // that happened while they were off.
@@ -900,7 +906,10 @@ function refreshHookStatus(): void {
 // --------------------------------------------------------------------- IPC
 
 function registerIpc(): void {
-  ipcMain.handle('ui:get-view', () => ({ ...currentView(), expanded: loadConfig().expanded }));
+  ipcMain.handle('ui:get-view', () => {
+    const cfg = loadConfig();
+    return { ...currentView(), expanded: cfg.expanded, sound: cfg.sound };
+  });
   ipcMain.handle('ui:set-expanded', (_e, expanded: unknown) => {
     setExpanded(Boolean(expanded));
   });
@@ -1008,6 +1017,7 @@ function registerIpc(): void {
       completedDismissMs: cfg.completedDismissMs,
       debugLog: cfg.debugLog,
       notifications: cfg.notifications,
+      sound: cfg.sound,
       permissionDecisions: cfg.permissionDecisions,
       decisionWindowMs: cfg.decisionWindowMs,
       openAtLogin: startsWithWindows(),
@@ -1041,6 +1051,7 @@ function registerIpc(): void {
 
     if (typeof p.debugLog === 'boolean') next.debugLog = p.debugLog;
     if (typeof p.notifications === 'boolean') next.notifications = p.notifications;
+    if (typeof p.sound === 'boolean') next.sound = p.sound;
     if (typeof p.permissionDecisions === 'boolean') next.permissionDecisions = p.permissionDecisions;
     const window = num(p.decisionWindowMs, 3_000, 60_000);
     if (window !== undefined) next.decisionWindowMs = window;

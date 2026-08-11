@@ -519,7 +519,7 @@ shows has a shape you already recognise.
 |---|---|
 | **Hooks** | Install / remove for all projects or this project only, with live status, drift and the exact settings file path |
 | **Permission decisions** | Turn **Allow / Deny** on or off, and set the decision window. Changing either **rewrites the installed hooks for you** — the timeout lives inside them, so it would otherwise drift the moment you touched it |
-| **Behaviour** | Desktop notifications, start with Windows, stale threshold, auto-collapse delay |
+| **Behaviour** | Desktop notifications, **sound on blocked**, start with Windows, stale threshold, auto-collapse delay |
 | **Data** | Debug log, open the data folder, clear the 30 days behind Analysis (confirms first) |
 | **About** | Version, listening address, current shortcut |
 
@@ -558,6 +558,7 @@ No environment variables, no `.env`. One JSON file, created on first launch:
 | `completedDismissMs` | `20000` | How long a completed turn stays expanded. `0` disables. |
 | `debugLog` | `false` | Opt-in local logging of event **names only**, never payloads. Off by default. |
 | `notifications` | `true` | Desktop toasts. Off still leaves the bar working — it just stops interrupting you. |
+| `sound` | `false` | A short chime when a session blocks on you. Only for a genuinely actionable prompt. |
 | `permissionDecisions` | `false` | Enable **Allow / Deny**. Changing it requires reinstalling the hooks. |
 | `decisionWindowMs` | `15000` | How long a prompt may be held. The longest this app can ever stall one tool call. |
 | `barWidth` | `560` | Capsule width, remembered from the left-edge grip. Height is fixed. |

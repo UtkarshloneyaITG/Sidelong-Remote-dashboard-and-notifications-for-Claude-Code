@@ -7,14 +7,14 @@
  * pushes. Neither can change a status.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import {
   MIN_SAMPLES, savings, trend,
   type DayCounts, type OverlayView, type SessionView, type Severity,
 } from '@sidelong/protocol';
 
-type RendererView = OverlayView & { expanded: boolean };
+type RendererView = OverlayView & { expanded: boolean; sound: boolean };
 
 declare global {
   interface Window {
@@ -66,6 +66,7 @@ interface SettingsPayload {
   completedDismissMs: number;
   debugLog: boolean;
   notifications: boolean;
+  sound: boolean;
   permissionDecisions: boolean;
   decisionWindowMs: number;
   openAtLogin: boolean;
@@ -128,6 +129,84 @@ const RING: Record<Severity, string> = {
   neutral: '',
   offline: '',
 };
+
+/**
+ * The blocked chime: two notes, synthesised, ~350ms.
+ *
+ * Synthesised rather than shipped as an audio file. Nothing to package, license
+ * or fail to load, and the envelope can be shaped deliberately: a soft attack and
+ * a long tail is what separates a chime from a beep, and a square edge at either
+ * end is what makes people hate notification sounds.
+ *
+ * A rising perfect fourth (A5 to D6). It reads as a question rather than an
+ * alarm, which is exactly the message -- something is waiting on you, nothing is
+ * wrong.
+ *
+ * One AudioContext, made on first use and kept: browsers cap how many you may
+ * open, and a status bar could plausibly chime hundreds of times in a day.
+ */
+let audio: AudioContext | undefined;
+
+export function chime(): void {
+  try {
+    const Ctor = window.AudioContext
+      ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    audio ??= new Ctor();
+    void audio.resume();
+
+    const start = audio.currentTime;
+    [880, 1174.66].forEach((freq, i) => {
+      const ctx = audio as AudioContext;
+      const at = start + i * 0.085;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      // exponentialRamp cannot touch zero, hence the near-silent floor.
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.16, at + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(at);
+      osc.stop(at + 0.32);
+    });
+  } catch {
+    // No audio device, or the context was refused. Silence is an acceptable
+    // failure for a notification sound -- the bar still says everything.
+  }
+}
+
+/**
+ * Chime once when a session becomes genuinely blocked on you.
+ *
+ * Keyed on the permission itself, not on the render: the view is pushed every two
+ * seconds, and a sound that fired on every push would be unbearable within a
+ * minute. Keys are dropped when their prompt clears, so the same command blocking
+ * again later is a new event and chimes again.
+ *
+ * Suppressed when you are already looking at the window the session belongs to --
+ * the same rule the notifier applies, for the same reason. Prompts seen while the
+ * sound is off are still marked as heard, so switching it on does not fire a
+ * backlog of chimes for things you already dealt with.
+ */
+function useBlockedChime(view: RendererView | null): void {
+  const heard = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!view) return;
+    const live = new Set<string>();
+    for (const s of view.sessions) {
+      if (!s.permissionActionable || !s.permissionKey) continue;
+      const id = `${s.sessionId}:${s.permissionKey}`;
+      live.add(id);
+      if (heard.current.has(id)) continue;
+      heard.current.add(id);
+      const focused = s.bridge?.focused ?? (view.bridge.focused && !s.bridge);
+      if (view.sound && !focused) chime();
+    }
+    for (const id of [...heard.current]) if (!live.has(id)) heard.current.delete(id);
+  }, [view]);
+}
 
 function clock(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -849,6 +928,21 @@ function Settings({ onClose }: { onClose: () => void }): JSX.Element {
               checked={cfg.notifications}
               onChange={(v) => save({ notifications: v })}
             />
+            <div>
+              <Toggle
+                label="Sound when a session blocks"
+                note="A short chime, only for a prompt that is genuinely waiting on you — never for ordinary activity. Off by default. Silent while you are already looking at that session's VS Code window."
+                checked={cfg.sound}
+                onChange={(v) => save({ sound: v })}
+              />
+              <button
+                type="button"
+                className="no-drag ml-5 mt-1 rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100"
+                onClick={() => chime()}
+              >
+                Play it
+              </button>
+            </div>
             <Toggle
               label="Start with Windows"
               checked={cfg.openAtLogin}
@@ -1199,6 +1293,8 @@ export default function App(): JSX.Element {
     void window.watcher.getView().then(setView);
     return window.watcher.onView(setView);
   }, []);
+
+  useBlockedChime(view);
 
   const active = view?.active;
   const elapsed = useElapsed(active);

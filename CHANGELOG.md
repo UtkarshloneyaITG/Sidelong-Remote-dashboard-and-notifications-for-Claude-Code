@@ -11,6 +11,39 @@ code — each entry names the root cause rather than the symptom.
 
 ## [Unreleased]
 
+### Added
+
+- **A sound when a session blocks on you.** The README's opening argument is that a
+  permission prompt makes "no sound, no taskbar flash — it just quietly stops."
+  Until now the answer to that was a *visual*, which only works if the bar is in
+  your field of view. On a second monitor, or behind a full-screen window, you
+  still missed it. Sound is the one channel that reaches you wherever you are
+  looking.
+
+  Fires **only** for a prompt genuinely waiting on you — never for ordinary
+  activity — and stays silent while you are already looking at that session's
+  VS Code window, the same rule the notifier uses. **Off by default:** an app that
+  makes noise the first time you run it is rude, so it is offered rather than
+  assumed. There is a **Play it** button in Settings so you can hear it before
+  committing.
+
+  Synthesised in the renderer rather than shipped as an audio file: nothing to
+  package, license or fail to load, and the envelope can be shaped deliberately.
+  Two sine notes a rising fourth apart (A5 → D6), soft attack, long tail — a
+  square edge at either end is what makes people hate notification sounds. It
+  reads as a question, not an alarm, which is the actual message: something is
+  waiting on you, nothing is wrong.
+
+  One thing this needed that is easy to miss: `autoplayPolicy:
+  'no-user-gesture-required'`. Chromium refuses audio until the user has
+  interacted with the page, and this page is a status bar you may never click —
+  so the chime would have been silently dropped in exactly the case it exists for.
+
+  Verified by process inspection rather than by ear: Chromium spawns
+  `audio.mojom.AudioService` only when audio output is genuinely initialised, and
+  it appears on the first blocked prompt. That proves it played and was not
+  blocked by policy. Whether it is *pleasant* is not something a test can answer.
+
 ### Fixed
 
 - **`AskUserQuestion` was offered Allow / Deny, which cannot answer it.** Reported

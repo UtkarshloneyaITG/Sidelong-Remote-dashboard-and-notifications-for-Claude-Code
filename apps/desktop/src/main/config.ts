@@ -41,6 +41,16 @@ export interface AppConfig {
    */
   notifications: boolean;
   /**
+   * A short chime when a session becomes blocked on you.
+   *
+   * OFF by default. Notifications are visual and can be missed on a second
+   * monitor or behind a full-screen window, which is the gap this closes -- but
+   * an app that makes noise the first time you run it is rude, so it is offered
+   * rather than assumed. Only ever fires for a genuinely actionable prompt, never
+   * for ordinary activity.
+   */
+  sound: boolean;
+  /**
    * Let the overlay ANSWER permission prompts with Allow / Deny.
    *
    * OFF by default, deliberately. It changes what this app is: a watcher becomes
@@ -83,6 +93,7 @@ const DEFAULTS: Omit<AppConfig, 'token'> = {
   completedDismissMs: 20_000,
   debugLog: false,
   notifications: true,
+  sound: false,
   permissionDecisions: false,
   decisionWindowMs: 15_000,
   expanded: false,

@@ -10,7 +10,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { OverlayView } from '@sidelong/protocol';
 
-export type RendererView = OverlayView & { expanded: boolean };
+export type RendererView = OverlayView & { expanded: boolean; sound: boolean };
 
 const api = {
   /** Push subscription. Returns an unsubscribe. */
