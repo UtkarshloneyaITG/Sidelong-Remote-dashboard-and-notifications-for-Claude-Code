@@ -192,3 +192,60 @@ input {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ── the card's own motion ─────────────────────────────────────────────────
+   A row that has just appeared slides into place instead of blinking into
+   existence. The lists are keyed by tool_use_id, so the browser runs this on
+   genuinely NEW elements only -- a re-render reuses the DOM node and the
+   animation does not replay. That is what makes it read as "that just
+   happened" rather than as the panel twitching every two seconds. */
+.row-in {
+  animation: row-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-5px, 5px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The one activity that is happening NOW. A slow ping rather than a blink:
+   the point is to be findable in peripheral vision, not to demand the eye. */
+.dot-live {
+  animation: dot-live 1.8s ease-in-out infinite;
+}
+
+@keyframes dot-live {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Arriving is still worth marking, so the fade stays and the travel goes. */
+  .row-in {
+    animation-duration: 120ms;
+    animation-name: row-fade;
+  }
+  .dot-live {
+    animation: none;
+  }
+}
+
+@keyframes row-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

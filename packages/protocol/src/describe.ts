@@ -195,6 +195,26 @@ export function commandKey(toolName: string | undefined, detail: string): string
   return prog;
 }
 
+/**
+ * Tools whose prompt cannot be answered with Allow / Deny.
+ *
+ * `AskUserQuestion` puts a multiple-choice question in front of you. Approving
+ * the tool call does not answer it -- it only lets the question be asked, and you
+ * still have to go to the editor and pick an option. So offering Allow/Deny is
+ * worse than useless twice over: it implies you have dealt with something you
+ * have not, and while the request is held open Claude Code cannot show you the
+ * question at all. A held prompt blocks the tool call, and here the tool call IS
+ * the question.
+ *
+ * These get "no decision" immediately, which is what makes the real prompt appear
+ * straight away, and the bar shows [Open VS Code] [ok] instead -- because going
+ * there is genuinely the only thing you can do.
+ */
+const ANSWERED_IN_EDITOR = new Set(['AskUserQuestion']);
+
+export const needsEditorAnswer = (toolName: string | undefined): boolean =>
+  Boolean(toolName && ANSWERED_IN_EDITOR.has(toolName));
+
 /** The permission line: "Run `npm install`?" rather than "needs permission". */
 export function describePermission(
   toolName: string | undefined,

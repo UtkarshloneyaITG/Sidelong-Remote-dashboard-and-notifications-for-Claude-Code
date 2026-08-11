@@ -409,11 +409,11 @@ function ActivityList({ session }: { session: SessionView }): JSX.Element | null
       <div className="px-0.5 pb-1 text-[10px] uppercase tracking-wider text-zinc-600">Activity</div>
       <ul className="space-y-0.5">
         {items.map((a) => (
-          <li key={a.id} className="flex items-start gap-2 rounded px-0.5 py-0.5 text-[11px]">
+          <li key={a.id} className="row-in flex items-start gap-2 rounded px-0.5 py-0.5 text-[11px]">
             <span
               className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${
                 a.status === 'failed' ? 'bg-rose-500'
-                  : a.status === 'running' ? 'bg-emerald-400' : 'bg-zinc-600'
+                  : a.status === 'running' ? 'bg-emerald-400 dot-live' : 'bg-zinc-600'
               }`}
             />
             <span className={`min-w-0 flex-1 truncate ${a.status === 'failed' ? 'text-rose-300' : 'text-zinc-300'}`}>
@@ -438,7 +438,7 @@ function FilesChanged({ session }: { session: SessionView }): JSX.Element | null
       </div>
       <ul className="space-y-0.5">
         {session.filesChanged.slice(-6).map((f) => (
-          <li key={f} className="truncate px-0.5 font-mono text-[10.5px] text-zinc-400">{f}</li>
+          <li key={f} className="row-in truncate px-0.5 font-mono text-[10.5px] text-zinc-400">{f}</li>
         ))}
       </ul>
     </div>
@@ -1193,7 +1193,6 @@ export default function App(): JSX.Element {
   const [view, setView] = useState<RendererView | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [openHint, openEditor] = useOpenEditor();
   const cornerGrip = useGrip('corner');
 
   useEffect(() => {
@@ -1310,14 +1309,15 @@ export default function App(): JSX.Element {
             the middle of a page of empty space -- and controls belong at the
             edge you reach for, not in the middle of what you are reading.
             `mt-auto` puts them there however tall the card is dragged. */}
+        {/* No "Open VS Code" here on purpose.
+            On the capsule the button is unambiguous -- one session is on screen
+            and the button focuses THAT session's window. Down here it sits in a
+            row of app-wide controls next to Settings, Analysis and Quit, where it
+            reads as "open VS Code" generally, and nothing on the row tells you
+            which window or file it would raise. A control whose target you cannot
+            see is not a control, it is a guess. It stays on the bar, where the
+            session it belongs to is the thing you are looking at. */}
         <div className="mt-auto flex items-center gap-2 px-2.5 pb-1.5 pt-3">
-          <button
-            type="button"
-            className="no-drag rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100"
-            onClick={() => openEditor(active?.sessionId)}
-          >
-            Open VS Code
-          </button>
           <button
             type="button"
             className="no-drag rounded border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-200"
@@ -1332,7 +1332,6 @@ export default function App(): JSX.Element {
           >
             Analysis
           </button>
-          {openHint && <span className="truncate text-[9.5px] text-amber-300">{openHint}</span>}
           <button
             type="button"
             className="no-drag ml-auto text-[10px] text-zinc-700 hover:text-zinc-400"

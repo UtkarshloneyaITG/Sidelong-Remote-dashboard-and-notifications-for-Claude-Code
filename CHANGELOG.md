@@ -9,6 +9,57 @@ code — each entry names the root cause rather than the symptom.
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **`AskUserQuestion` was offered Allow / Deny, which cannot answer it.** Reported
+  from use. Approving that tool call does not answer the question — it only lets
+  the question be *asked*, and you still have to go to the editor and pick an
+  option. So the buttons implied you had dealt with something you had not.
+
+  The worse half was invisible: with decisions on, that prompt was **held open for
+  up to fifteen seconds**, and a held prompt blocks the tool call. Here the tool
+  call *is* the question, so the hold was delaying the very thing you needed to
+  see. It is now handed straight back, so Claude Code shows the question
+  immediately, and the bar offers **Open VS Code · ok** — the honest set of
+  actions for a prompt only the editor can resolve.
+
+  Measured, decisions on, 15s window: a `Bash` prompt still holds for **15.02s**;
+  an `AskUserQuestion` returns in **0.01s**.
+
+### Changed
+
+- **Removed *Open VS Code* from the card's action row.** On the capsule the button
+  is unambiguous — one session is on screen and it focuses that session's window.
+  Down in a row of app-wide controls next to Settings, Analysis and Quit it read
+  as "open VS Code" generally, with nothing to say which window or file it would
+  raise. A control whose target you cannot see is a guess, not a control. It stays
+  on the bar, where the session it belongs to is the thing you are looking at.
+
+- **The card now moves.** Three additions, all of them about making change
+  legible rather than decorative:
+
+  - **New activity rows slide in.** The lists are keyed by tool id, so the browser
+    runs the animation on genuinely new elements only — a re-render reuses the DOM
+    node and nothing replays. That is what makes it read as "that just happened"
+    instead of the panel twitching every two seconds.
+  - **The running item pings.** A slow pulse on its dot, findable in peripheral
+    vision without demanding the eye.
+  - **Expanding and collapsing is animated.** 560×56 becoming 348×428 in one frame
+    read as two different windows; stepped over 190ms with an ease-out it reads as
+    one bar opening. The right edge is pinned throughout, for the same reason the
+    capsule's grip pins it — the overlay lives in the top-right corner, and
+    animating from the left would walk it off screen and back.
+
+    Sampled mid-collapse: `488x397 → 652x145 → 684x95 → 700x70`, right edge moving
+    **0px**.
+
+  All three respect `prefers-reduced-motion`: rows fade without travelling, the
+  ping stops, and the window still changes size — it just stops being a journey.
+
+---
+
 ## [1.1.3] — 2026-08-11
 
 ### Fixed

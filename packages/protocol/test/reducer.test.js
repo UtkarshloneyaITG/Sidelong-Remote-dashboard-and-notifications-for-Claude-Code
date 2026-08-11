@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 import { loadFixture } from '../../../tools/replay.mjs';
 import {
-  absoluteFile, commandKey, savings, trend,
+  absoluteFile, commandKey, needsEditorAnswer, savings, trend,
   buildHookConfig, buildView, describePermission, describeTool, findDrift, allowlistProblem,
   PERMISSION_GRACE_MS, humanGap, decisionTimeoutSeconds,
   initialState, isStale, mergeHooks, reduce, reduceAll, removeHooks, severityOf, shortPath,
@@ -268,6 +268,16 @@ test('but a stale message from an older turn does not masquerade as the question
     ),
   ]);
   assert.equal(only(after).message, 'Claude is waiting for your input');
+});
+
+test('a question is not an Allow/Deny prompt', () => {
+  // Approving AskUserQuestion does not answer it -- it only lets the question be
+  // asked. Holding it open blocks the tool call, and here the tool call IS the
+  // question, so the hold delays the very thing you need to see.
+  assert.equal(needsEditorAnswer('AskUserQuestion'), true);
+  for (const t of ['Bash', 'Edit', 'Write', 'Read', 'WebFetch', 'ExitPlanMode', undefined, '']) {
+    assert.equal(needsEditorAnswer(t), false, `${t} should stay decidable`);
+  }
 });
 
 // ------------------------------------------------------- command key (on disk)

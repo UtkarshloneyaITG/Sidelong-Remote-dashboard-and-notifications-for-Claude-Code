@@ -18,7 +18,7 @@ import {
   screen, shell,
 } from 'electron';
 import {
-  PERMISSION_GRACE_MS, buildView, commandKey, hookBaseUrl, prunable,
+  PERMISSION_GRACE_MS, buildView, commandKey, hookBaseUrl, needsEditorAnswer, prunable,
   type BridgeInfo, type DayCounts, type OverlayView,
 } from '@sidelong/protocol';
 import { AdapterRegistry, ClaudeCodeAdapter } from '@sidelong/agent-adapters';
@@ -539,11 +539,55 @@ function saveBounds(w: BrowserWindow): void {
   updateConfig({ bounds: { x: b.x, y: b.y, width: b.width, height: b.height } });
 }
 
+/**
+ * Grow and shrink between the capsule and the card instead of cutting.
+ *
+ * The window used to jump: 560x56 became 348x428 in one frame, which reads as
+ * two different windows rather than one changing shape. Stepped over ~190ms with
+ * an ease-out, it reads as the bar opening.
+ *
+ * The RIGHT edge is held for the same reason the capsule's grip holds it -- the
+ * overlay lives in the top-right corner, so animating width from the left would
+ * walk it off screen and back.
+ *
+ * Frames are driven by setTimeout rather than a fixed interval so a slow frame
+ * cannot queue up behind itself, and the final frame sets the exact target: an
+ * eased sequence must never leave the window a pixel short of where it belongs.
+ */
+const MODE_ANIM_MS = 190;
+let modeAnim: NodeJS.Timeout | undefined;
+
+function animateToMode(width: number, height: number): void {
+  if (!win) return;
+  if (modeAnim) clearTimeout(modeAnim);
+
+  const from = win.getBounds();
+  const right = from.x + from.width;
+  const started = Date.now();
+
+  const step = (): void => {
+    if (!win || win.isDestroyed()) return;
+    const t = Math.min(1, (Date.now() - started) / MODE_ANIM_MS);
+    // easeOutCubic: quick off the mark, settles rather than stops.
+    const e = 1 - (1 - t) ** 3;
+    const w = Math.round(from.width + (width - from.width) * e);
+    const h = Math.round(from.height + (height - from.height) * e);
+    win.setBounds({ x: right - w, y: from.y, width: w, height: h });
+    if (t < 1) {
+      modeAnim = setTimeout(step, 16);
+      return;
+    }
+    modeAnim = undefined;
+    win.setBounds({ x: right - width, y: from.y, width, height });
+  };
+  step();
+}
+
 function setExpanded(expanded: boolean): void {
   updateConfig({ expanded });
   if (!win) return;
   const size = modeSize(expanded);
-  win.setContentSize(size.width, size.height);
+  animateToMode(size.width, size.height);
   pushView();
 }
 
@@ -617,6 +661,16 @@ async function startServers(): Promise<void> {
           // delaying it. This is what stops the feature making things WORSE
           // when you are not using the overlay.
           if (bridge?.getInfo().focused) {
+            settle(null);
+            return;
+          }
+          // Some prompts cannot be answered with Allow/Deny at all -- an
+          // AskUserQuestion wants you to PICK something. Holding one open blocks
+          // the tool call, and here the tool call is the question, so we would be
+          // delaying the very thing you need to see. Hand it straight back; the
+          // bar then offers [Open VS Code] [ok], which is the honest set of
+          // actions for a prompt only the editor can resolve.
+          if (needsEditorAnswer(env.event.tool_name)) {
             settle(null);
             return;
           }
